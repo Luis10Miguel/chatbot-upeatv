@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 const express = require("express");
@@ -15,6 +16,154 @@ const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || "v26.0";
+
+const menuPrincipal = `¡Hola! 👋
+Bienvenido al asistente virtual de UPEA TV 📺
+
+¿En qué podemos ayudarte?
+
+1. 📡 Programación y horarios
+2. 📰 Noticias y novedades
+3. 🎬 Nuestros programas
+4. 📍 Ubicación y contacto
+5. 💬 Atención al usuario
+
+Escribe el número o el nombre de una opción.
+
+Escribe MENU para regresar al inicio.`;
+
+const respuestas = {
+  programacion: `📡 PROGRAMACIÓN Y HORARIOS
+UPEA TV
+
+Estos horarios son ficticios y sirven únicamente para probar el chatbot.
+
+🕗 08:00 - Noticias de la mañana
+🕙 10:00 - Revista universitaria
+🕛 12:00 - Resumen informativo
+🕒 15:00 - Cultura y sociedad
+🕕 18:00 - Actualidad universitaria
+🕗 20:00 - Noticias de la noche
+
+Los horarios reales se incorporarán posteriormente.
+
+Escribe MENU para volver al inicio.`,
+
+  noticias: `📰 NOTICIAS Y NOVEDADES
+
+Bienvenido a la sección informativa de UPEA TV.
+
+Aquí podrás consultar:
+• Noticias universitarias
+• Información educativa
+• Actualidad de El Alto
+• Cultura y acontecimientos sociales
+
+Esta es una descripción de demostración. Las noticias reales se incorporarán posteriormente.
+
+Escribe MENU para volver al inicio.`,
+
+  programas: `🎬 PROGRAMAS DE UPEA TV
+
+Estos son nombres de ejemplo para la demostración:
+
+1. UPEA Noticias
+2. Revista Universitaria
+3. Cultura Viva
+4. Jóvenes en Acción
+5. Deportes Universitarios
+
+Los nombres son ficticios y pueden cambiarse cuando tengas la programación oficial.
+
+Escribe MENU para volver al inicio.`,
+
+  contacto: `📍 UBICACIÓN Y CONTACTO
+
+UPEA TV
+Canal de televisión de temática universitaria.
+
+Información disponible para completar:
+• Dirección: pendiente de confirmar
+• Teléfono: pendiente de confirmar
+• Facebook: pendiente de confirmar
+• YouTube: pendiente de confirmar
+• Horarios de atención: pendiente de confirmar
+
+No se muestran datos de contacto ficticios para evitar confusiones.
+
+Escribe MENU para volver al inicio.`,
+
+  atencion: `💬 ATENCIÓN AL USUARIO
+
+Gracias por comunicarte con UPEA TV.
+
+Puedes escribir tu consulta en este chat. Por el momento, el sistema registra el mensaje, pero no transfiere automáticamente la conversación a un administrador.
+
+Escribe MENU para volver al inicio.`
+};
+
+function normalizar(texto) {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[.!?,;:]+$/g, "");
+}
+
+function obtenerRespuesta(texto) {
+  const mensaje = normalizar(texto);
+
+  if (
+    ["hola", "hi", "hello", "buenas", "buenos dias",
+     "buenas tardes", "buenas noches", "menu", "inicio",
+     "volver", "principal", "0"].includes(mensaje)
+  ) {
+    return menuPrincipal;
+  }
+
+  if (
+    ["1", "programacion", "horarios", "horario"].includes(mensaje)
+  ) {
+    return respuestas.programacion;
+  }
+
+  if (
+    ["2", "noticias", "novedades", "informacion"].includes(mensaje)
+  ) {
+    return respuestas.noticias;
+  }
+
+  if (
+    ["3", "programas", "programa", "television"].includes(mensaje)
+  ) {
+    return respuestas.programas;
+  }
+
+  if (
+    ["4", "contacto", "ubicacion", "direccion", "redes"].includes(mensaje)
+  ) {
+    return respuestas.contacto;
+  }
+
+  if (
+    ["5", "atencion", "administrador", "ayuda", "consulta"].includes(mensaje)
+  ) {
+    return respuestas.atencion;
+  }
+
+  return `No pude identificar tu consulta. 🤔
+
+Puedes escribir una de estas opciones:
+
+1. Programación y horarios
+2. Noticias y novedades
+3. Nuestros programas
+4. Ubicación y contacto
+5. Atención al usuario
+
+Escribe MENU para regresar al inicio.`;
+}
 
 async function guardarMensaje(numero, tipo, mensaje) {
   try {
@@ -40,82 +189,10 @@ async function prepararBaseDatos() {
         fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
     console.log("Tabla de mensajes lista");
   } catch (error) {
     console.error("Error al preparar la base de datos:", error.message);
-  }
-}
-
-const menuPrincipal = `¡Hola! 👋
-Bienvenido al asistente virtual de UPEA TV 📺
-
-¿En qué podemos ayudarte?
-
-1. 📡 Programación y horarios
-2. 📰 Noticias y novedades
-3. 🎬 Información de programas
-4. 📍 Ubicación y contacto
-5. 💬 Contactar con un administrador
-
-Escribe el número de la opción que necesitas.`;
-
-function obtenerRespuesta(texto) {
-  const opcion = texto.trim().toLowerCase();
-
-  switch (opcion) {
-    case "1":
-      return `📡 PROGRAMACIÓN Y HORARIOS
-
-Consulta aquí la programación de UPEA TV.
-
-Los horarios actualizados estarán disponibles cuando se incorpore la programación oficial del canal.
-
-Escribe MENU para volver al menú principal.`;
-
-    case "2":
-      return `📰 NOTICIAS Y NOVEDADES
-
-Bienvenido a la sección de noticias de UPEA TV.
-
-Próximamente podrás consultar las últimas novedades del canal.
-
-Escribe MENU para volver al menú principal.`;
-
-    case "3":
-      return `🎬 PROGRAMAS DE UPEA TV
-
-Aquí podrás consultar información sobre los programas, sus contenidos y horarios.
-
-La información oficial de cada programa se añadirá posteriormente.
-
-Escribe MENU para volver al menú principal.`;
-
-    case "4":
-      return `📍 CONTACTO DE UPEA TV
-
-Para mostrar la dirección, los teléfonos y las redes sociales oficiales, debemos registrar los datos confirmados del canal.
-
-Escribe MENU para volver al menú principal.`;
-
-    case "5":
-      return `💬 ATENCIÓN AL USUARIO
-
-Has seleccionado contactar con un administrador.
-
-Por el momento, este chatbot no transfiere automáticamente la conversación a una persona. Puedes dejar tu consulta para que se implemente un mecanismo de atención.
-
-Escribe MENU para volver al menú principal.`;
-
-    case "menu":
-    case "hola":
-    case "buenas":
-    case "inicio":
-      return menuPrincipal;
-
-    default:
-      return `No reconocí esa opción. 🤔
-
-${menuPrincipal}`;
   }
 }
 
@@ -150,12 +227,13 @@ async function enviarWhatsApp(numero, mensaje) {
 }
 
 app.get("/", (req, res) => {
-  res.send("Chatbot UPEA TV funcionando");
+  res.send("Chatbot UPEA TV funcionando correctamente");
 });
 
 app.get("/db-test", async (req, res) => {
   try {
     const resultado = await pool.query("SELECT NOW() AS fecha");
+
     res.json({
       conectado: true,
       fecha: resultado.rows[0].fecha
@@ -180,41 +258,42 @@ app.get("/webhook", (req, res) => {
   return res.sendStatus(403);
 });
 
-app.post("/webhook", async (req, res) => {
+app.post("/webhook", (req, res) => {
   res.sendStatus(200);
 
-  try {
-    const entradas = req.body.entry || [];
+  procesarWebhook(req.body).catch(error => {
+    console.error("Error procesando webhook:", error.message);
+  });
+});
 
-    for (const entrada of entradas) {
-      for (const cambio of entrada.changes || []) {
-        const datos = cambio.value;
+async function procesarWebhook(cuerpo) {
+  for (const entrada of cuerpo.entry || []) {
+    for (const cambio of entrada.changes || []) {
+      const datos = cambio.value;
 
-        if (!datos.messages) continue;
+      for (const mensaje of datos.messages || []) {
+        if (mensaje.type !== "text") continue;
 
-        for (const mensaje of datos.messages) {
-          if (mensaje.type !== "text") continue;
+        const numero = mensaje.from;
+        const texto = mensaje.text.body;
 
-          const numero = mensaje.from;
-          const texto = mensaje.text.body;
+        await guardarMensaje(numero, "entrada", texto);
 
-          await guardarMensaje(numero, "entrada", texto);
+        const respuesta = obtenerRespuesta(texto);
 
-          const respuesta = obtenerRespuesta(texto);
-
-          try {
-            await enviarWhatsApp(numero, respuesta);
-            await guardarMensaje(numero, "salida", respuesta);
-          } catch (error) {
-            console.error("Error respondiendo a WhatsApp:", error.message);
-          }
+        try {
+          await enviarWhatsApp(numero, respuesta);
+          await guardarMensaje(numero, "salida", respuesta);
+        } catch (error) {
+          console.error(
+            "Error respondiendo a WhatsApp:",
+            error.message
+          );
         }
       }
     }
-  } catch (error) {
-    console.error("Error procesando webhook:", error.message);
   }
-});
+}
 
 const PORT = process.env.PORT || 3000;
 
