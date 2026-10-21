@@ -6,6 +6,9 @@ const { Pool } = require("pg");
 
 const app = express();
 app.use(express.json());
+const path = require("path");
+
+app.use("/media", express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 3000;
 
@@ -389,6 +392,48 @@ async function enviarWhatsApp(numero, texto) {
     if (!respuesta.ok) {
         console.error("Error de WhatsApp:", JSON.stringify(resultado));
         throw new Error("No se pudo enviar el mensaje a WhatsApp.");
+    }
+
+    return resultado;
+}
+
+
+async function enviarImagenWhatsApp(numero, url, descripcion) {
+    return enviarMultimediaWhatsApp(numero, "image", url, descripcion);
+}
+
+async function enviarVideoWhatsApp(numero, url, descripcion) {
+    return enviarMultimediaWhatsApp(numero, "video", url, descripcion);
+}
+
+async function enviarMultimediaWhatsApp(numero, tipo, url, descripcion) {
+    const version = process.env.GRAPH_API_VERSION || "v26.0";
+    const endpoint =
+        `https://graph.facebook.com/${version}/${process.env.PHONE_NUMBER_ID}/messages`;
+
+    const respuesta = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: numero,
+            type: tipo,
+            [tipo]: {
+                link: url,
+                caption: descripcion
+            }
+        })
+    });
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok) {
+        console.error("Error enviando multimedia:", resultado);
+        throw new Error("No se pudo enviar el archivo multimedia.");
     }
 
     return resultado;
