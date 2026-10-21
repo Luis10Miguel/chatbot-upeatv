@@ -7,298 +7,652 @@ const { Pool } = require("pg");
 const app = express();
 app.use(express.json());
 
+const PORT = process.env.PORT || 3000;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
 });
 
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || "v26.0";
+const FACEBOOK = "https://www.facebook.com/upeatelevisioncanal25";
+const TIKTOK = "https://www.tiktok.com/@upeatelevisionoficial";
+const YOUTUBE = "https://www.youtube.com/@UPEATELEVISI%C3%93NOFICIAL";
+const WEB = "https://tv.upea.bo/";
+const CORREO = "upeatelevisioncanal25@gmail.com";
+const MAPS = "https://maps.app.goo.gl/LfoYfLBZW5JiC6Vm8";
 
-const menuPrincipal = `¡Hola! 👋
+const programas = [
+    {
+        nombre: "Apoyo Legal",
+        dia: "Horario pendiente de confirmación",
+        horario: "Horario pendiente de confirmación",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Programa de información y orientación legal. Descripción provisional.",
+        grabaciones: []
+    },
+    {
+        nombre: "Mente y Corazón",
+        dia: "Todos los viernes",
+        horario: "19:30",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Espacio dedicado a temas relacionados con la mente y las emociones.",
+        grabaciones: []
+    },
+    {
+        nombre: "ElectroIngenio",
+        dia: "Horario pendiente de confirmación",
+        horario: "Horario pendiente de confirmación",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Descripción pendiente de confirmación.",
+        grabaciones: []
+    },
+    {
+        nombre: "IUS EX Catedrá",
+        dia: "Horario pendiente de confirmación",
+        horario: "Horario pendiente de confirmación",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Descripción pendiente de confirmación.",
+        grabaciones: []
+    },
+    {
+        nombre: "Raíces Vivas",
+        dia: "Horario pendiente de confirmación",
+        horario: "Horario pendiente de confirmación",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Descripción pendiente de confirmación.",
+        grabaciones: []
+    },
+    {
+        nombre: "Toda Mi Gente",
+        dia: "Horario pendiente de confirmación",
+        horario: "Horario pendiente de confirmación",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Descripción pendiente de confirmación.",
+        grabaciones: []
+    },
+    {
+        nombre: "Campeones con Altura",
+        dia: "Horario pendiente de confirmación",
+        horario: "Horario pendiente de confirmación",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Descripción pendiente de confirmación.",
+        grabaciones: []
+    },
+    {
+        nombre: "Educa Parvulitos",
+        dia: "Horario pendiente de confirmación",
+        horario: "Horario pendiente de confirmación",
+        redes: "Enlace pendiente de confirmación",
+        contacto: "Contacto pendiente de confirmación",
+        descripcion: "Descripción pendiente de confirmación.",
+        grabaciones: []
+    }
+];
+
+const periodicos = Array.from({ length: 16 }, (_, i) => ({
+    nombre: `Periódico ${i + 1}`,
+    url: ""
+}));
+
+function menuPrincipal() {
+    return `📺 *ASISTENTE VIRTUAL DE UPEA TV*
+
+¡Hola! 👋
 Bienvenido al asistente virtual de UPEA TV 📺
 
 ¿En qué podemos ayudarte?
 
 1. 📡 Programación y horarios
 2. 📰 Noticias y novedades
-3. 🎬 Nuestros programas
+3. 🎬 Información de programas
 4. 📍 Ubicación y contacto
-5. 💬 Atención al usuario
+5. 💬 Contactar con un administrador
 
-Escribe el número o el nombre de una opción.
+Escribe el número de la opción que necesitas.
 
-Escribe MENU para regresar al inicio.`;
-
-const respuestas = {
-  programacion: `📡 PROGRAMACIÓN Y HORARIOS
-UPEA TV
-
-Estos horarios son ficticios y sirven únicamente para probar el chatbot.
-
-🕗 08:00 - Noticias de la mañana
-🕙 10:00 - Revista universitaria
-🕛 12:00 - Resumen informativo
-🕒 15:00 - Cultura y sociedad
-🕕 18:00 - Actualidad universitaria
-🕗 20:00 - Noticias de la noche
-
-Los horarios reales se incorporarán posteriormente.
-
-Escribe MENU para volver al inicio.`,
-
-  noticias: `📰 NOTICIAS Y NOVEDADES
-
-Bienvenido a la sección informativa de UPEA TV.
-
-Aquí podrás consultar:
-• Noticias universitarias
-• Información educativa
-• Actualidad de El Alto
-• Cultura y acontecimientos sociales
-
-Esta es una descripción de demostración. Las noticias reales se incorporarán posteriormente.
-
-Escribe MENU para volver al inicio.`,
-
-  programas: `🎬 PROGRAMAS DE UPEA TV
-
-Estos son nombres de ejemplo para la demostración:
-
-1. UPEA Noticias
-2. Revista Universitaria
-3. Cultura Viva
-4. Jóvenes en Acción
-5. Deportes Universitarios
-
-Los nombres son ficticios y pueden cambiarse cuando tengas la programación oficial.
-
-Escribe MENU para volver al inicio.`,
-
-  contacto: `📍 UBICACIÓN Y CONTACTO
-
-UPEA TV
-Canal de televisión de temática universitaria.
-
-Información disponible para completar:
-• Dirección: pendiente de confirmar
-• Teléfono: pendiente de confirmar
-• Facebook: pendiente de confirmar
-• YouTube: pendiente de confirmar
-• Horarios de atención: pendiente de confirmar
-
-No se muestran datos de contacto ficticios para evitar confusiones.
-
-Escribe MENU para volver al inicio.`,
-
-  atencion: `💬 ATENCIÓN AL USUARIO
-
-Gracias por comunicarte con UPEA TV.
-
-Puedes escribir tu consulta en este chat. Por el momento, el sistema registra el mensaje, pero no transfiere automáticamente la conversación a un administrador.
-
-Escribe MENU para volver al inicio.`
-};
-
-function normalizar(texto) {
-  return texto
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[.!?,;:]+$/g, "");
+Escribe *MENU* en cualquier momento para volver al menú principal.`;
 }
 
-function obtenerRespuesta(texto) {
-  const mensaje = normalizar(texto);
+function menuProgramas(tipo) {
+    const titulo = tipo === "horarios"
+        ? "📡 *PROGRAMACIÓN Y HORARIOS*"
+        : "🎬 *INFORMACIÓN DE PROGRAMAS*";
 
-  if (
-    ["hola", "hi", "hello", "buenas", "buenos dias",
-     "buenas tardes", "buenas noches", "menu", "inicio",
-     "volver", "principal", "0"].includes(mensaje)
-  ) {
-    return menuPrincipal;
-  }
+    return `${titulo}
 
-  if (
-    ["1", "programacion", "horarios", "horario"].includes(mensaje)
-  ) {
-    return respuestas.programacion;
-  }
+Selecciona el programa que deseas consultar:
 
-  if (
-    ["2", "noticias", "novedades", "informacion"].includes(mensaje)
-  ) {
-    return respuestas.noticias;
-  }
+${programas.map((p, i) => `${i + 1}. ${p.nombre}`).join("\n")}
+9. Volver al menú principal`;
+}
 
-  if (
-    ["3", "programas", "programa", "television"].includes(mensaje)
-  ) {
-    return respuestas.programas;
-  }
+function detalleHorario(indice) {
+    const p = programas[indice];
 
-  if (
-    ["4", "contacto", "ubicacion", "direccion", "redes"].includes(mensaje)
-  ) {
-    return respuestas.contacto;
-  }
+    return `📺 *${p.nombre.toUpperCase()}*
 
-  if (
-    ["5", "atencion", "administrador", "ayuda", "consulta"].includes(mensaje)
-  ) {
-    return respuestas.atencion;
-  }
+📅 Día de emisión: ${p.dia}
+🕒 Horario: ${p.horario}
 
-  return `No pude identificar tu consulta. 🤔
+📱 Redes sociales:
+${p.redes}
 
-Puedes escribir una de estas opciones:
+📞 Contactos:
+${p.contacto}
 
-1. Programación y horarios
-2. Noticias y novedades
-3. Nuestros programas
-4. Ubicación y contacto
-5. Atención al usuario
+0. Volver al menú principal`;
+}
 
-Escribe MENU para regresar al inicio.`;
+function menuNoticias() {
+    return `📰 *NOTICIAS Y NOVEDADES*
+
+¡Mantente informado con UPEA TV!
+
+Estas son las portadas de los periódicos del día.
+
+🗞️ *PORTADAS DE LOS PERIÓDICOS*
+
+${periodicos.map((p, i) =>
+        `${i + 1}. ${p.nombre}\n${p.url ? `🔗 Ver portada: ${p.url}` : "🖼️ Portada pendiente de publicación"}`
+    ).join("\n\n")}
+
+0. Volver al menú principal`;
+}
+
+function detallePrograma(indice) {
+    const p = programas[indice];
+
+    const grabaciones = p.grabaciones.length
+        ? p.grabaciones.map((g, i) =>
+            `${i + 1}. ${g.titulo}\n🔗 ${g.url}`
+        ).join("\n\n")
+        : "Las grabaciones se publicarán próximamente.";
+
+    return `🎬 *${p.nombre.toUpperCase()}*
+
+📝 Descripción:
+${p.descripcion}
+
+🎥 *Grabaciones disponibles*
+${grabaciones}
+
+🔗 Página oficial de Facebook de UPEA TV:
+${FACEBOOK}
+
+0. Volver al menú principal`;
+}
+
+function menuContacto() {
+    return `📍 *UBICACIÓN Y CONTACTO*
+
+📺 ¡Visítanos! Te mostramos cómo llegar a UPEA TV.
+
+📍 *Ubicación del canal*
+🔗 Google Maps:
+${MAPS}
+
+🎥 *Video de cómo llegar*
+▶️ Enlace pendiente de publicación.
+
+📸 *Fotografías de la entrada*
+Las fotografías se publicarán próximamente.
+
+📞 *Contactos y redes sociales*
+
+📘 Facebook:
+${FACEBOOK}
+
+🎵 TikTok:
+${TIKTOK}
+
+▶️ YouTube:
+${YOUTUBE}
+
+🌐 Página web:
+${WEB}
+
+✉️ Correo electrónico:
+${CORREO}
+
+0. Volver al menú principal`;
+}
+
+function menuAdministrador() {
+    return `💬 *CONTACTAR CON UN ADMINISTRADOR*
+
+¡Estamos aquí para ayudarte! 👋
+
+Selecciona una opción:
+
+1. ❓ Preguntas frecuentes
+2. 📝 Dejar una consulta para el equipo de UPEA TV
+3. 🌐 Ver nuestras redes sociales y contactos
+4. Volver al menú principal`;
+}
+
+function preguntasFrecuentes() {
+    return `❓ *PREGUNTAS FRECUENTES*
+
+1. ¿Cómo puedo conocer los horarios de los programas?
+Consulta la opción 1 del menú principal.
+
+2. ¿Dónde puedo ver las grabaciones?
+Ingresa a Información de programas.
+
+3. ¿Cómo puedo consultar las portadas de los periódicos?
+Selecciona Noticias y novedades.
+
+4. ¿Cómo puedo llegar a UPEA TV?
+Consulta Ubicación y contacto.
+
+5. ¿Cómo puedo contactar con UPEA TV?
+Consulta las redes sociales y el correo electrónico en Ubicación y contacto.
+
+6. Volver al menú de administrador`;
+}
+
+function menuRedes() {
+    return `🌐 *REDES SOCIALES Y CONTACTOS*
+
+📘 Facebook:
+${FACEBOOK}
+
+🎵 TikTok:
+${TIKTOK}
+
+▶️ YouTube:
+${YOUTUBE}
+
+🌐 Página web:
+${WEB}
+
+✉️ Correo electrónico:
+${CORREO}
+
+0. Volver al menú principal`;
 }
 
 async function guardarMensaje(numero, tipo, mensaje) {
-  try {
-    await pool.query(
-      `INSERT INTO mensajes_whatsapp
-       (numero_usuario, tipo, mensaje)
-       VALUES ($1, $2, $3)`,
-      [numero, tipo, mensaje]
-    );
-  } catch (error) {
-    console.error("Error al guardar mensaje:", error.message);
-  }
+    try {
+        await pool.query(
+            `INSERT INTO mensajes_whatsapp
+             (numero_usuario, tipo, mensaje)
+             VALUES ($1, $2, $3)`,
+            [numero, tipo, mensaje]
+        );
+    } catch (error) {
+        console.error("Error guardando mensaje:", error.message);
+    }
 }
 
 async function prepararBaseDatos() {
-  try {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS mensajes_whatsapp (
-        id BIGSERIAL PRIMARY KEY,
-        numero_usuario VARCHAR(30) NOT NULL,
-        tipo VARCHAR(10) NOT NULL,
-        mensaje TEXT NOT NULL,
-        fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      )
+        CREATE TABLE IF NOT EXISTS sesiones_bot (
+            numero_usuario VARCHAR(30) PRIMARY KEY,
+            estado VARCHAR(60) NOT NULL DEFAULT 'inicio',
+            datos JSONB NOT NULL DEFAULT '{}'::jsonb,
+            actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
     `);
 
-    console.log("Tabla de mensajes lista");
-  } catch (error) {
-    console.error("Error al preparar la base de datos:", error.message);
-  }
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS consultas_bot (
+            id SERIAL PRIMARY KEY,
+            numero_usuario VARCHAR(30) NOT NULL,
+            nombre VARCHAR(150),
+            motivo VARCHAR(200),
+            mensaje TEXT,
+            estado VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+            creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS contenido_bot (
+            id SERIAL PRIMARY KEY,
+            categoria VARCHAR(50) NOT NULL,
+            titulo VARCHAR(150) NOT NULL,
+            contenido TEXT NOT NULL,
+            activo BOOLEAN NOT NULL DEFAULT TRUE,
+            orden INTEGER NOT NULL DEFAULT 1,
+            actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    console.log("Base de datos preparada.");
 }
 
-async function enviarWhatsApp(numero, mensaje) {
-  const url =
-    `https://graph.facebook.com/${GRAPH_API_VERSION}/` +
-    `${PHONE_NUMBER_ID}/messages`;
+async function obtenerSesion(numero) {
+    const r = await pool.query(
+        `SELECT estado, datos
+         FROM sesiones_bot
+         WHERE numero_usuario = $1`,
+        [numero]
+    );
 
-  const respuesta = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${META_ACCESS_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: numero,
-      type: "text",
-      text: { body: mensaje }
-    })
-  });
+    if (r.rows.length === 0) {
+        return { estado: "inicio", datos: {} };
+    }
 
-  const resultado = await respuesta.json();
+    return r.rows[0];
+}
 
-  if (!respuesta.ok) {
-    console.error("Error de Meta:", JSON.stringify(resultado));
-    throw new Error("No se pudo enviar el mensaje por WhatsApp");
-  }
+async function guardarSesion(numero, estado, datos = {}) {
+    await pool.query(
+        `INSERT INTO sesiones_bot
+         (numero_usuario, estado, datos, actualizado_en)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (numero_usuario)
+         DO UPDATE SET
+           estado = EXCLUDED.estado,
+           datos = EXCLUDED.datos,
+           actualizado_en = CURRENT_TIMESTAMP`,
+        [numero, estado, JSON.stringify(datos)]
+    );
+}
 
-  return resultado;
+async function enviarWhatsApp(numero, texto) {
+    const token = process.env.META_ACCESS_TOKEN;
+    const phoneId = process.env.PHONE_NUMBER_ID;
+    const version = process.env.GRAPH_API_VERSION || "v26.0";
+
+    if (!token || !phoneId) {
+        throw new Error("Faltan META_ACCESS_TOKEN o PHONE_NUMBER_ID.");
+    }
+
+    const url = `https://graph.facebook.com/${version}/${phoneId}/messages`;
+
+    const respuesta = await fetch(url, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: numero,
+            type: "text",
+            text: { body: texto }
+        })
+    });
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok) {
+        console.error("Error de WhatsApp:", JSON.stringify(resultado));
+        throw new Error("No se pudo enviar el mensaje a WhatsApp.");
+    }
+
+    return resultado;
+}
+
+async function guardarConsulta(numero, datos) {
+    await pool.query(
+        `INSERT INTO consultas_bot
+         (numero_usuario, nombre, motivo, mensaje)
+         VALUES ($1, $2, $3, $4)`,
+        [numero, datos.nombre, datos.motivo, datos.mensaje]
+    );
+}
+
+async function obtenerRespuesta(numero, texto) {
+    const mensaje = texto.trim();
+    const normalizado = mensaje.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    if (["menu", "inicio", "hola", "buenas", "hi", "hello",
+         "buenos dias", "buenas tardes", "buenas noches"].includes(normalizado)) {
+        await guardarSesion(numero, "inicio", {});
+        return menuPrincipal();
+    }
+
+    const sesion = await obtenerSesion(numero);
+    const estado = sesion.estado;
+    const datos = sesion.datos || {};
+
+    if (normalizado === "0") {
+        await guardarSesion(numero, "inicio", {});
+        return menuPrincipal();
+    }
+
+    if (estado === "inicio") {
+        if (normalizado === "1") {
+            await guardarSesion(numero, "horarios", {});
+            return menuProgramas("horarios");
+        }
+
+        if (normalizado === "2") {
+            await guardarSesion(numero, "noticias", {});
+            return menuNoticias();
+        }
+
+        if (normalizado === "3") {
+            await guardarSesion(numero, "programas", {});
+            return menuProgramas("programas");
+        }
+
+        if (normalizado === "4") {
+            await guardarSesion(numero, "inicio", {});
+            return menuContacto();
+        }
+
+        if (normalizado === "5") {
+            await guardarSesion(numero, "administrador", {});
+            return menuAdministrador();
+        }
+
+        return menuPrincipal();
+    }
+
+    if (estado === "horarios" || estado === "programas") {
+        if (normalizado === "9") {
+            await guardarSesion(numero, "inicio", {});
+            return menuPrincipal();
+        }
+
+        const indice = Number(normalizado) - 1;
+
+        if (!Number.isInteger(indice) || indice < 0 || indice >= programas.length) {
+            return `Selecciona un número del 1 al 8 o escribe 9 para volver al menú principal.\n\n${menuProgramas(estado)}`;
+        }
+
+        await guardarSesion(
+            numero,
+            estado === "horarios" ? "detalle_horario" : "detalle_programa",
+            { programa: indice }
+        );
+
+        return estado === "horarios"
+            ? detalleHorario(indice)
+            : detallePrograma(indice);
+    }
+
+    if (estado === "detalle_horario" || estado === "detalle_programa") {
+        if (estado === "detalle_horario") {
+            await guardarSesion(numero, "horarios", {});
+            return menuProgramas("horarios");
+        }
+
+        await guardarSesion(numero, "programas", {});
+        return menuProgramas("programas");
+    }
+
+    if (estado === "noticias") {
+        return `${menuNoticias()}\n\nEscribe 0 para volver al menú principal.`;
+    }
+
+    if (estado === "administrador") {
+        if (normalizado === "1") {
+            await guardarSesion(numero, "faq", {});
+            return preguntasFrecuentes();
+        }
+
+        if (normalizado === "2") {
+            await guardarSesion(numero, "consulta_nombre", {});
+            return `📝 *DEJAR UNA CONSULTA*\n\nPor favor, escribe tu nombre.`;
+        }
+
+        if (normalizado === "3") {
+            await guardarSesion(numero, "redes", {});
+            return menuRedes();
+        }
+
+        if (normalizado === "4") {
+            await guardarSesion(numero, "inicio", {});
+            return menuPrincipal();
+        }
+
+        return menuAdministrador();
+    }
+
+    if (estado === "faq") {
+        await guardarSesion(numero, "administrador", {});
+        return `${preguntasFrecuentes()}\n\nEscribe un número para volver a consultar o 6 para volver al menú de administrador.`;
+    }
+
+    if (estado === "redes") {
+        await guardarSesion(numero, "administrador", {});
+        return menuAdministrador();
+    }
+
+    if (estado === "consulta_nombre") {
+        if (mensaje.length < 2 || mensaje.length > 150) {
+            return "Escribe un nombre válido de hasta 150 caracteres.";
+        }
+
+        await guardarSesion(numero, "consulta_motivo", { nombre: mensaje });
+        return "📌 Ahora escribe el motivo de tu consulta.";
+    }
+
+    if (estado === "consulta_motivo") {
+        if (mensaje.length < 2 || mensaje.length > 200) {
+            return "Escribe un motivo válido de hasta 200 caracteres.";
+        }
+
+        await guardarSesion(numero, "consulta_mensaje", {
+            ...datos,
+            motivo: mensaje
+        });
+
+        return "💬 Ahora escribe tu mensaje o consulta para el equipo de UPEA TV.";
+    }
+
+    if (estado === "consulta_mensaje") {
+        if (mensaje.length < 2 || mensaje.length > 3000) {
+            return "Escribe un mensaje de entre 2 y 3000 caracteres.";
+        }
+
+        const consulta = {
+            ...datos,
+            mensaje
+        };
+
+        await guardarConsulta(numero, consulta);
+        await guardarSesion(numero, "inicio", {});
+
+        return `¡Gracias por comunicarte con UPEA TV! 📺
+
+Tu consulta ha sido registrada para que el equipo pueda revisarla y responderte cuando esté disponible.
+
+La atención no es inmediata ni está disponible las 24 horas.
+
+Escribe MENU para volver al menú principal.`;
+    }
+
+    await guardarSesion(numero, "inicio", {});
+    return menuPrincipal();
 }
 
 app.get("/", (req, res) => {
-  res.send("Chatbot UPEA TV funcionando correctamente");
-});
-
-app.get("/db-test", async (req, res) => {
-  try {
-    const resultado = await pool.query("SELECT NOW() AS fecha");
-
-    res.json({
-      conectado: true,
-      fecha: resultado.rows[0].fecha
-    });
-  } catch (error) {
-    res.status(500).json({
-      conectado: false,
-      error: error.message
-    });
-  }
+    res.send("Chatbot UPEA TV funcionando correctamente.");
 });
 
 app.get("/webhook", (req, res) => {
-  const modo = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const desafio = req.query["hub.challenge"];
+    const modo = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
 
-  if (modo === "subscribe" && token === VERIFY_TOKEN) {
-    return res.status(200).send(desafio);
-  }
+    if (modo === "subscribe" && token === process.env.VERIFY_TOKEN) {
+        return res.status(200).send(challenge);
+    }
 
-  return res.sendStatus(403);
+    return res.sendStatus(403);
 });
 
 app.post("/webhook", (req, res) => {
-  res.sendStatus(200);
+    res.sendStatus(200);
 
-  procesarWebhook(req.body).catch(error => {
-    console.error("Error procesando webhook:", error.message);
-  });
+    procesarWebhook(req.body).catch(error => {
+        console.error("Error procesando webhook:", error.message);
+    });
 });
 
-async function procesarWebhook(cuerpo) {
-  for (const entrada of cuerpo.entry || []) {
-    for (const cambio of entrada.changes || []) {
-      const datos = cambio.value;
+async function procesarWebhook(body) {
+    const entradas = body.entry || [];
 
-      for (const mensaje of datos.messages || []) {
-        if (mensaje.type !== "text") continue;
+    for (const entrada of entradas) {
+        for (const cambio of entrada.changes || []) {
+            const mensajes = cambio.value?.messages || [];
 
-        const numero = mensaje.from;
-        const texto = mensaje.text.body;
+            for (const mensaje of mensajes) {
+                if (mensaje.type !== "text") {
+                    continue;
+                }
 
-        await guardarMensaje(numero, "entrada", texto);
+                const numero = mensaje.from;
+                const texto = mensaje.text?.body || "";
 
-        const respuesta = obtenerRespuesta(texto);
+                await guardarMensaje(numero, "entrada", texto);
 
-        try {
-          await enviarWhatsApp(numero, respuesta);
-          await guardarMensaje(numero, "salida", respuesta);
-        } catch (error) {
-          console.error(
-            "Error respondiendo a WhatsApp:",
-            error.message
-          );
+                let respuesta;
+
+                try {
+                    respuesta = await obtenerRespuesta(numero, texto);
+                } catch (error) {
+                    console.error("Error generando respuesta:", error.message);
+                    respuesta = "Ocurrió un problema al procesar tu solicitud. Inténtalo nuevamente o escribe MENU.";
+                }
+
+                try {
+                    await enviarWhatsApp(numero, respuesta);
+                    await guardarMensaje(numero, "salida", respuesta);
+                } catch (error) {
+                    console.error("Error enviando respuesta:", error.message);
+                }
+            }
         }
-      }
     }
-  }
 }
 
-const PORT = process.env.PORT || 3000;
-
-prepararBaseDatos();
-
-app.listen(PORT, () => {
-  console.log(`Servidor funcionando en el puerto ${PORT}`);
+app.get("/db-test", async (req, res) => {
+    try {
+        const resultado = await pool.query("SELECT NOW() AS fecha");
+        res.json({
+            estado: "conectado",
+            baseDatos: resultado.rows[0]
+        });
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ error: "No se pudo conectar con la base de datos." });
+    }
 });
+
+prepararBaseDatos()
+    .then(() => {
+        app.listen(PORT, "0.0.0.0", () => {
+            console.log(`Chatbot UPEA TV activo en el puerto ${PORT}`);
+        });
+    })
+    .catch(error => {
+        console.error("No se pudo preparar la base de datos:", error.message);
+        process.exit(1);
+    });
