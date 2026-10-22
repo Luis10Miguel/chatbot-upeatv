@@ -677,14 +677,96 @@ try {
     await guardarMensaje(numero, "salida", respuesta);
 
     if (estadoAnterior === "inicio" && texto.trim() === "2") {
-        const urlPortada =
-            "https://chatbot-upeatv.onrender.com/media/periodicos/periodico1.jpg";
+        const baseUrl =
+    "https://chatbot-upeatv.onrender.com/media/periodicos/";
+    
+      
+if (estadoAnterior === "inicio" && texto.trim() === "4") {
+    const baseUrl =
+        "https://chatbot-upeatv.onrender.com/media/ubicacion/";
 
+    // 1. Enviar el video de cómo llegar
+    try {
+        await enviarMultimediaWhatsApp(
+            numero,
+            "video",
+            `${baseUrl}video1.mp4`,
+            "📍 *¿Cómo llegar a UPEA TV?*\n\nMira este video para conocer el recorrido hasta nuestras instalaciones."
+        );
+
+        await guardarMensaje(
+            numero,
+            "salida",
+            "Video de cómo llegar a UPEA TV"
+        );
+    } catch (error) {
+        console.error("Error enviando el video:", error.message);
+    }
+
+    // 2. Enviar las cuatro fotos de la entrada
+    const fotos = [
+        {
+            archivo: "fotoentrada1.png",
+            descripcion: "📸 Entrada de UPEA TV - Foto 1"
+        },
+        {
+            archivo: "fotoentrada2.png",
+            descripcion: "📸 Referencia de ingreso - Foto 2"
+        },
+        {
+            archivo: "fotoentrada3.png",
+            descripcion: "📸 Referencia de ingreso - Foto 3"
+        },
+        {
+            archivo: "fotoentrada4.png",
+            descripcion: "📸 Referencia de ingreso - Foto 4"
+        }
+    ];
+
+    for (const foto of fotos) {
+        try {
+            await enviarImagenWhatsApp(
+                numero,
+                `${baseUrl}${foto.archivo}`,
+                foto.descripcion
+            );
+
+            await guardarMensaje(
+                numero,
+                "salida",
+                foto.descripcion
+            );
+        } catch (error) {
+            console.error(
+                `Error enviando ${foto.archivo}:`,
+                error.message
+            );
+        }
+    }
+}
+
+for (let i = 1; i <= 16; i++) {
+    const urlPortada = `${baseUrl}periodico${i}.jpg`;
+
+    try {
         await enviarImagenWhatsApp(
             numero,
             urlPortada,
-            "🗞️ Portada de prueba del periódico 1 - UPEA TV"
+            `🗞️ Portada del periódico ${i} - UPEA TV`
         );
+
+        await guardarMensaje(
+            numero,
+            "salida",
+            `Portada del periódico ${i}`
+        );
+    } catch (error) {
+        console.error(
+            `Error enviando la portada ${i}:`,
+            error.message
+        );
+    }
+}
 
         await guardarMensaje(
             numero,
