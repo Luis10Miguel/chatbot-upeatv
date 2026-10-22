@@ -200,10 +200,10 @@ function menuContacto() {
 ${MAPS}
 
 🎥 *Video de cómo llegar*
-▶️ Enlace pendiente de publicación.
+A continuación recibirás un video para orientarte.
 
 📸 *Fotografías de la entrada*
-Las fotografías se publicarán próximamente.
+También te enviaremos fotografías de referencia.
 
 📞 *Contactos y redes sociales*
 
@@ -639,6 +639,7 @@ app.post("/webhook", (req, res) => {
     });
 });
 
+
 async function procesarWebhook(body) {
     const entradas = body.entry || [];
 
@@ -656,132 +657,144 @@ async function procesarWebhook(body) {
 
                 await guardarMensaje(numero, "entrada", texto);
 
-                
-let respuesta;
-let estadoAnterior = "inicio";
+                let respuesta;
+                let estadoAnterior = "inicio";
 
-try {
-    const sesionAnterior = await obtenerSesion(numero);
-    estadoAnterior = sesionAnterior.estado;
+                try {
+                    const sesionAnterior = await obtenerSesion(numero);
+                    estadoAnterior = sesionAnterior.estado;
 
-    respuesta = await obtenerRespuesta(numero, texto);
-} catch (error) {
-    console.error("Error generando respuesta:", error.message);
-    respuesta = "Ocurrió un problema al procesar tu solicitud. Inténtalo nuevamente o escribe MENU.";
-}
- 
+                    respuesta = await obtenerRespuesta(numero, texto);
+                } catch (error) {
+                    console.error(
+                        "Error generando respuesta:",
+                        error.message
+                    );
 
-                
-try {
-    await enviarWhatsApp(numero, respuesta);
-    await guardarMensaje(numero, "salida", respuesta);
+                    respuesta =
+                        "Ocurrió un problema al procesar tu solicitud. Inténtalo nuevamente o escribe MENU.";
+                }
 
-    if (estadoAnterior === "inicio" && texto.trim() === "2") {
-        const baseUrl =
-    "https://chatbot-upeatv.onrender.com/media/periodicos/";
-    
-      
-if (estadoAnterior === "inicio" && texto.trim() === "4") {
-    const baseUrl =
-        "https://chatbot-upeatv.onrender.com/media/ubicacion/";
+                try {
+                    // Primero enviar la respuesta de texto
+                    await enviarWhatsApp(numero, respuesta);
+                    await guardarMensaje(numero, "salida", respuesta);
 
-    // 1. Enviar el video de cómo llegar
-    try {
-        await enviarMultimediaWhatsApp(
-            numero,
-            "video",
-            `${baseUrl}video1.mp4`,
-            "📍 *¿Cómo llegar a UPEA TV?*\n\nMira este video para conocer el recorrido hasta nuestras instalaciones."
-        );
+                    const opcion = texto.trim();
 
-        await guardarMensaje(
-            numero,
-            "salida",
-            "Video de cómo llegar a UPEA TV"
-        );
-    } catch (error) {
-        console.error("Error enviando el video:", error.message);
-    }
+                    // OPCIÓN 2: enviar las 16 portadas
+                    if (
+                        estadoAnterior === "inicio" &&
+                        opcion === "2"
+                    ) {
+                        const baseUrl =
+                            "https://chatbot-upeatv.onrender.com/media/periodicos/";
 
-    // 2. Enviar las cuatro fotos de la entrada
-    const fotos = [
-        {
-            archivo: "fotoentrada1.png",
-            descripcion: "📸 Entrada de UPEA TV - Foto 1"
-        },
-        {
-            archivo: "fotoentrada2.png",
-            descripcion: "📸 Referencia de ingreso - Foto 2"
-        },
-        {
-            archivo: "fotoentrada3.png",
-            descripcion: "📸 Referencia de ingreso - Foto 3"
-        },
-        {
-            archivo: "fotoentrada4.png",
-            descripcion: "📸 Referencia de ingreso - Foto 4"
-        }
-    ];
+                        for (let i = 1; i <= 16; i++) {
+                            const urlPortada =
+                                `${baseUrl}periodico${i}.jpg`;
 
-    for (const foto of fotos) {
-        try {
-            await enviarImagenWhatsApp(
-                numero,
-                `${baseUrl}${foto.archivo}`,
-                foto.descripcion
-            );
+                            try {
+                                await enviarImagenWhatsApp(
+                                    numero,
+                                    urlPortada,
+                                    `🗞️ Portada del periódico ${i} - UPEA TV`
+                                );
 
-            await guardarMensaje(
-                numero,
-                "salida",
-                foto.descripcion
-            );
-        } catch (error) {
-            console.error(
-                `Error enviando ${foto.archivo}:`,
-                error.message
-            );
-        }
-    }
-}
+                                await guardarMensaje(
+                                    numero,
+                                    "salida",
+                                    `Portada del periódico ${i}`
+                                );
+                            } catch (error) {
+                                console.error(
+                                    `Error enviando la portada ${i}:`,
+                                    error.message
+                                );
+                            }
+                        }
+                    }
 
-for (let i = 1; i <= 16; i++) {
-    const urlPortada = `${baseUrl}periodico${i}.jpg`;
+                    // OPCIÓN 4: enviar el video y las fotos
+                    if (
+                        estadoAnterior === "inicio" &&
+                        opcion === "4"
+                    ) {
+                        const baseUrl =
+                            "https://chatbot-upeatv.onrender.com/media/ubicacion/";
 
-    try {
-        await enviarImagenWhatsApp(
-            numero,
-            urlPortada,
-            `🗞️ Portada del periódico ${i} - UPEA TV`
-        );
+                        // Enviar video de cómo llegar
+                        try {
+                            await enviarVideoWhatsApp(
+                                numero,
+                                `${baseUrl}video1.mp4`,
+                                "📍 ¿Cómo llegar a UPEA TV? Mira este video para conocer el recorrido hasta nuestras instalaciones."
+                            );
 
-        await guardarMensaje(
-            numero,
-            "salida",
-            `Portada del periódico ${i}`
-        );
-    } catch (error) {
-        console.error(
-            `Error enviando la portada ${i}:`,
-            error.message
-        );
-    }
-}
+                            await guardarMensaje(
+                                numero,
+                                "salida",
+                                "Video de cómo llegar a UPEA TV"
+                            );
+                        } catch (error) {
+                            console.error(
+                                "Error enviando el video:",
+                                error.message
+                            );
+                        }
 
-        await guardarMensaje(
-            numero,
-            "salida",
-            "Portada de prueba del periódico 1"
-        );
-    }
-} catch (error) {
-    console.error("Error enviando respuesta o imagen:", error.message);
-}
+                        // Enviar fotografías de la entrada
+                        const fotos = [
+                            {
+                                archivo: "fotoentrada1.png",
+                                descripcion: "📸 Entrada de UPEA TV - Foto 1"
+                            },
+                            {
+                                archivo: "fotoentrada2.png",
+                                descripcion: "📸 Referencia de ingreso - Foto 2"
+                            },
+                            {
+                                archivo: "fotoentrada3.png",
+                                descripcion: "📸 Referencia de ingreso - Foto 3"
+                            },
+                            {
+                                archivo: "fotoentrada4.png",
+                                descripcion: "📸 Referencia de ingreso - Foto 4"
+                            }
+                        ];
 
+                        for (const foto of fotos) {
+                            try {
+                                await enviarImagenWhatsApp(
+                                    numero,
+                                    `${baseUrl}${foto.archivo}`,
+                                    foto.descripcion
+                                );
+
+                                await guardarMensaje(
+                                    numero,
+                                    "salida",
+                                    foto.descripcion
+                                );
+                            } catch (error) {
+                                console.error(
+                                    `Error enviando ${foto.archivo}:`,
+                                    error.message
+                                );
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(
+                        "Error enviando respuesta de WhatsApp:",
+                        error.message
+                    );
+                }
             }
         }
     }
 }
+
 
 app.get("/db-test", async (req, res) => {
     try {
