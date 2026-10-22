@@ -153,21 +153,19 @@ ${p.contacto}
 0. Volver al menú principal`;
 }
 
+
 function menuNoticias() {
     return `📰 *NOTICIAS Y NOVEDADES*
 
 ¡Mantente informado con UPEA TV!
 
-Estas son las portadas de los periódicos del día.
+Estas son las portadas de los periódicos del día. 🗞️
 
-🗞️ *PORTADAS DE LOS PERIÓDICOS*
+Te compartimos las portadas disponibles.
 
-${periodicos.map((p, i) =>
-        `${i + 1}. ${p.nombre}\n${p.url ? `🔗 Ver portada: ${p.url}` : "🖼️ Portada pendiente de publicación"}`
-    ).join("\n\n")}
-
-0. Volver al menú principal`;
+Escribe 0 para volver al menú principal.`;
 }
+
 
 function detallePrograma(indice) {
     const p = programas[indice];
@@ -658,21 +656,46 @@ async function procesarWebhook(body) {
 
                 await guardarMensaje(numero, "entrada", texto);
 
-                let respuesta;
+                
+let respuesta;
+let estadoAnterior = "inicio";
 
-                try {
-                    respuesta = await obtenerRespuesta(numero, texto);
-                } catch (error) {
-                    console.error("Error generando respuesta:", error.message);
-                    respuesta = "Ocurrió un problema al procesar tu solicitud. Inténtalo nuevamente o escribe MENU.";
-                }
+try {
+    const sesionAnterior = await obtenerSesion(numero);
+    estadoAnterior = sesionAnterior.estado;
 
-                try {
-                    await enviarWhatsApp(numero, respuesta);
-                    await guardarMensaje(numero, "salida", respuesta);
-                } catch (error) {
-                    console.error("Error enviando respuesta:", error.message);
-                }
+    respuesta = await obtenerRespuesta(numero, texto);
+} catch (error) {
+    console.error("Error generando respuesta:", error.message);
+    respuesta = "Ocurrió un problema al procesar tu solicitud. Inténtalo nuevamente o escribe MENU.";
+}
+ 
+
+                
+try {
+    await enviarWhatsApp(numero, respuesta);
+    await guardarMensaje(numero, "salida", respuesta);
+
+    if (estadoAnterior === "inicio" && texto.trim() === "2") {
+        const urlPortada =
+            "https://chatbot-upeatv.onrender.com/media/periodicos/periodico1.jpg";
+
+        await enviarImagenWhatsApp(
+            numero,
+            urlPortada,
+            "🗞️ Portada de prueba del periódico 1 - UPEA TV"
+        );
+
+        await guardarMensaje(
+            numero,
+            "salida",
+            "Portada de prueba del periódico 1"
+        );
+    }
+} catch (error) {
+    console.error("Error enviando respuesta o imagen:", error.message);
+}
+
             }
         }
     }
