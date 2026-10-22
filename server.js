@@ -746,19 +746,19 @@ async function procesarWebhook(body) {
                         // Enviar fotografías de la entrada
                         const fotos = [
                             {
-                                archivo: "fotoentrada1.png",
+                                archivo: "fotoentrada1.jpg",
                                 descripcion: "📸 Entrada de UPEA TV - Foto 1"
                             },
                             {
-                                archivo: "fotoentrada2.png",
+                                archivo: "fotoentrada2.jpg",
                                 descripcion: "📸 Referencia de ingreso - Foto 2"
                             },
                             {
-                                archivo: "fotoentrada3.png",
+                                archivo: "fotoentrada3.jpg",
                                 descripcion: "📸 Referencia de ingreso - Foto 3"
                             },
                             {
-                                archivo: "fotoentrada4.png",
+                                archivo: "fotoentrada4.jpg",
                                 descripcion: "📸 Referencia de ingreso - Foto 4"
                             }
                         ];
