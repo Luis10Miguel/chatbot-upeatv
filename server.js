@@ -717,26 +717,7 @@ async function procesarWebhook(body) {
         await guardarMensaje(numero, "salida", respuesta);
     }
 
-                    // Enviar la imagen de Mente y Corazón
-// cuando se selecciona dentro de Programación y horarios
-if (
-    estadoAnterior === "horarios" &&
-    opcion === "2"
-) {
-    const urlImagen =
-        "https://chatbot-upeatv.onrender.com/media/mente-corazon.jpg";
 
-    try {
-        await enviarImagenWhatsApp(
-            numero,
-            urlImagen,
-            "📺 MENTE Y CORAZÓN\n\n" +
-            "📅 Día de emisión: Todos los viernes\n" +
-            "🕒 Horario: 19:30\n\n" +
-            "📱 Redes sociales: Enlace pendiente de confirmación\n" +
-            "📞 Contacto: Pendiente de confirmación\n\n" +
-            "Escribe 0 para volver al menú principal."
-        );
 
         await guardarMensaje(
             numero,
