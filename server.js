@@ -9,7 +9,7 @@ app.use(express.json());
 const path = require("path");
 
 app.use("/media", express.static(path.join(__dirname, "public")));
-
+app.use("/media", express.static(path.join(__dirname, "media")));
 const PORT = process.env.PORT || 3000;
 
 const pool = new Pool({
