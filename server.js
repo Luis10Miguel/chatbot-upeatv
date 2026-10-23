@@ -719,19 +719,6 @@ async function procesarWebhook(body) {
 
 
 
-        await guardarMensaje(
-            numero,
-            "salida",
-            "Imagen del programa Mente y Corazón"
-        );
-    } catch (error) {
-        console.error(
-            "Error enviando imagen de Mente y Corazón:",
-            error.message
-        );
-    }
-}
-
                     // OPCIÓN 2: enviar las 16 portadas
                     if (
                         estadoAnterior === "inicio" &&
