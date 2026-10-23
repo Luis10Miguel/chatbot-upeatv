@@ -676,11 +676,46 @@ async function procesarWebhook(body) {
                 }
 
                 try {
-                    // Primero enviar la respuesta de texto
-                    await enviarWhatsApp(numero, respuesta);
-                    await guardarMensaje(numero, "salida", respuesta);
+    const opcion = texto.trim();
 
-                    const opcion = texto.trim();
+    // Enviar la imagen del programa seleccionado en horarios
+    if (
+        estadoAnterior === "horarios" &&
+        /^[1-8]$/.test(opcion)
+    ) {
+        const programasImagenes = [
+            "apoyo-legal.jpg",
+            "mente-corazon.jpg",
+            "electroingenio.jpg",
+            "ius-ex-catedra.jpg",
+            "raices-vivas.jpg",
+            "toda-mi-gente.jpg",
+            "campeones-con-altura.jpg",
+            "educa-parvulitos.jpg"
+        ];
+
+        const indice = Number(opcion) - 1;
+        const archivo = programasImagenes[indice];
+
+        const urlImagen =
+            `https://chatbot-upeatv.onrender.com/media/${archivo}`;
+
+        await enviarImagenWhatsApp(
+            numero,
+            urlImagen,
+            respuesta
+        );
+
+        await guardarMensaje(
+            numero,
+            "salida",
+            `Imagen del programa: ${archivo}. ${respuesta}`
+        );
+    } else {
+        // Para todas las demás opciones, conservar la respuesta normal
+        await enviarWhatsApp(numero, respuesta);
+        await guardarMensaje(numero, "salida", respuesta);
+    }
 
                     // Enviar la imagen de Mente y Corazón
 // cuando se selecciona dentro de Programación y horarios
