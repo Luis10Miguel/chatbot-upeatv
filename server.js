@@ -464,7 +464,101 @@ async function enviarMenuPrincipalWhatsApp(numero) {
 
     return resultado;
 }
+async function enviarListaProgramasWhatsApp(numero, tipo) {
+    const version = process.env.GRAPH_API_VERSION || "v26.0";
+    const endpoint =
+        `https://graph.facebook.com/${version}/${process.env.PHONE_NUMBER_ID}/messages`;
 
+    const titulo = tipo === "horarios"
+        ? "Programación y horarios"
+        : "Información de programas";
+
+    const filas = [
+        {
+            id: "1",
+            title: "Apoyo Legal",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "2",
+            title: "Mente y Corazón",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "3",
+            title: "ElectroIngenio",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "4",
+            title: "IUS EX Catedrá",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "5",
+            title: "Raíces Vivas",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "6",
+            title: "Toda Mi Gente",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "7",
+            title: "Campeones con Altura",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "8",
+            title: "Educa Parvulitos",
+            description: "Consulta información y horarios."
+        },
+        {
+            id: "9",
+            title: "Volver al menú",
+            description: "Regresar al menú principal."
+        }
+    ];
+
+    const respuesta = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: numero,
+            type: "interactive",
+            interactive: {
+                type: "list",
+                body: {
+                    text: `📺 ${titulo}\n\nSelecciona el programa que deseas consultar.`
+                },
+                action: {
+                    button: "Elegir un programa",
+                    sections: [
+                        {
+                            title: "Programas de UPEA TV",
+                            rows: filas
+                        }
+                    ]
+                }
+            }
+        })
+    });
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok) {
+        console.error("Error enviando submenú:", resultado);
+        throw new Error("No se pudo enviar el submenú de programas.");
+    }
+
+    return resultado;
+}
 async function enviarImagenWhatsApp(numero, url, descripcion) {
     return enviarMultimediaWhatsApp(numero, "image", url, descripcion);
 }
@@ -788,11 +882,31 @@ async function procesarWebhook(body) {
         // Enviar el menú interactivo cuando corresponda
 if (respuesta === menuPrincipal()) {
     await enviarMenuPrincipalWhatsApp(numero);
+
     await guardarMensaje(
         numero,
         "salida",
         "Menú principal interactivo enviado."
     );
+
+} else if (respuesta === menuProgramas("horarios")) {
+    await enviarListaProgramasWhatsApp(numero, "horarios");
+
+    await guardarMensaje(
+        numero,
+        "salida",
+        "Submenú interactivo de programación y horarios enviado."
+    );
+
+} else if (respuesta === menuProgramas("programas")) {
+    await enviarListaProgramasWhatsApp(numero, "programas");
+
+    await guardarMensaje(
+        numero,
+        "salida",
+        "Submenú interactivo de información de programas enviado."
+    );
+
 } else {
     await enviarWhatsApp(numero, respuesta);
     await guardarMensaje(numero, "salida", respuesta);
