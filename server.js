@@ -395,6 +395,75 @@ async function enviarWhatsApp(numero, texto) {
     return resultado;
 }
 
+async function enviarMenuPrincipalWhatsApp(numero) {
+    const version = process.env.GRAPH_API_VERSION || "v26.0";
+    const endpoint =
+        `https://graph.facebook.com/${version}/${process.env.PHONE_NUMBER_ID}/messages`;
+
+    const respuesta = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: numero,
+            type: "interactive",
+            interactive: {
+                type: "list",
+                body: {
+                    text: "¡Hola! 👋 Bienvenido al asistente virtual de UPEA TV 📺\n\n¿En qué podemos ayudarte? Selecciona una opción del menú."
+                },
+                action: {
+                    button: "Abrir menú",
+                    sections: [
+                        {
+                            title: "Menú principal",
+                            rows: [
+                                {
+                                    id: "1",
+                                    title: "📡 Programación y horarios",
+                                    description: "Consulta los horarios de nuestros programas."
+                                },
+                                {
+                                    id: "2",
+                                    title: "📰 Noticias y novedades",
+                                    description: "Conoce las noticias y portadas del día."
+                                },
+                                {
+                                    id: "3",
+                                    title: "🎬 Información de programas",
+                                    description: "Consulta las grabaciones de UPEA TV."
+                                },
+                                {
+                                    id: "4",
+                                    title: "📍 Ubicación y contacto",
+                                    description: "Encuentra nuestra ubicación y contactos."
+                                },
+                                {
+                                    id: "5",
+                                    title: "💬 Contactar administrador",
+                                    description: "Envía una consulta al equipo de UPEA TV."
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        })
+    });
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok) {
+        console.error("Error enviando menú interactivo:", resultado);
+        throw new Error("No se pudo enviar el menú interactivo.");
+    }
+
+    return resultado;
+}
 
 async function enviarImagenWhatsApp(numero, url, descripcion) {
     return enviarMultimediaWhatsApp(numero, "image", url, descripcion);
@@ -648,12 +717,15 @@ async function procesarWebhook(body) {
             const mensajes = cambio.value?.messages || [];
 
             for (const mensaje of mensajes) {
-                if (mensaje.type !== "text") {
-                    continue;
-                }
+    if (mensaje.type !== "text" && mensaje.type !== "interactive") {
+        continue;
+    }
 
-                const numero = mensaje.from;
-                const texto = mensaje.text?.body || "";
+    const numero = mensaje.from;
+
+    const texto = mensaje.type === "interactive"
+        ? mensaje.interactive?.list_reply?.id || ""
+        : mensaje.text?.body || "";
 
                 await guardarMensaje(numero, "entrada", texto);
 
@@ -713,8 +785,20 @@ async function procesarWebhook(body) {
         );
     } else {
         // Para todas las demás opciones, conservar la respuesta normal
-        await enviarWhatsApp(numero, respuesta);
-        await guardarMensaje(numero, "salida", respuesta);
+        // Enviar el menú interactivo cuando corresponda
+if (respuesta === menuPrincipal()) {
+    await enviarMenuPrincipalWhatsApp(numero);
+    await guardarMensaje(
+        numero,
+        "salida",
+        "Menú principal interactivo enviado."
+    );
+} else {
+    await enviarWhatsApp(numero, respuesta);
+    await guardarMensaje(numero, "salida", respuesta);
+}
+
+const opcion = texto.trim();
     }
 
 
