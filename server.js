@@ -422,32 +422,32 @@ async function enviarMenuPrincipalWhatsApp(numero) {
                         {
                             title: "Menú principal",
                             rows: [
-                                {
-                                    id: "1",
-                                    title: "📡 Programación y horarios",
-                                    description: "Consulta los horarios de nuestros programas."
-                                },
-                                {
-                                    id: "2",
-                                    title: "📰 Noticias y novedades",
-                                    description: "Conoce las noticias y portadas del día."
-                                },
-                                {
-                                    id: "3",
-                                    title: "🎬 Información de programas",
-                                    description: "Consulta las grabaciones de UPEA TV."
-                                },
-                                {
-                                    id: "4",
-                                    title: "📍 Ubicación y contacto",
-                                    description: "Encuentra nuestra ubicación y contactos."
-                                },
-                                {
-                                    id: "5",
-                                    title: "💬 Contactar administrador",
-                                    description: "Envía una consulta al equipo de UPEA TV."
-                                }
-                            ]
+    {
+        id: "1",
+        title: "📡 Programación",
+        description: "Consulta horarios de programas."
+    },
+    {
+        id: "2",
+        title: "📰 Noticias",
+        description: "Consulta noticias y portadas."
+    },
+    {
+        id: "3",
+        title: "🎬 Programas",
+        description: "Consulta las grabaciones."
+    },
+    {
+        id: "4",
+        title: "📍 Ubicación y contacto",
+        description: "Dirección, mapas y contactos."
+    },
+    {
+        id: "5",
+        title: "💬 Administrador",
+        description: "Envía una consulta a UPEA TV."
+    }
+]
                         }
                     ]
                 }
