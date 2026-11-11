@@ -423,27 +423,27 @@ async function enviarMenuPrincipalWhatsApp(numero) {
                             title: "Menú principal",
                             rows: [
     {
-        id: "1",
+        id: "principal_1",
         title: "📡 Programación",
         description: "Consulta horarios de programas."
     },
     {
-        id: "2",
+        id: "principal_2",
         title: "📰 Noticias",
         description: "Consulta noticias y portadas."
     },
     {
-        id: "3",
+        id: "principal_3",
         title: "🎬 Programas",
         description: "Consulta las grabaciones."
     },
     {
-        id: "4",
+        id: "principal_4",
         title: "📍 Ubicación y contacto",
         description: "Dirección, mapas y contactos."
     },
     {
-        id: "5",
+        id: "principal_5",
         title: "💬 Administrador",
         description: "Envía una consulta a UPEA TV."
     }
@@ -475,47 +475,47 @@ async function enviarListaProgramasWhatsApp(numero, tipo) {
 
     const filas = [
         {
-            id: "1",
+            id: `${tipo}_1`,
             title: "Apoyo Legal",
             description: "Consulta información y horarios."
         },
         {
-            id: "2",
+            id: `${tipo}_2`,
             title: "Mente y Corazón",
             description: "Consulta información y horarios."
         },
         {
-            id: "3",
+            id: `${tipo}_3`,
             title: "ElectroIngenio",
             description: "Consulta información y horarios."
         },
         {
-            id: "4",
+            id: `${tipo}_4`,
             title: "IUS EX Catedrá",
             description: "Consulta información y horarios."
         },
         {
-            id: "5",
+            id: `${tipo}_5`,
             title: "Raíces Vivas",
             description: "Consulta información y horarios."
         },
         {
-            id: "6",
+            id: `${tipo}_6`,
             title: "Toda Mi Gente",
             description: "Consulta información y horarios."
         },
         {
-            id: "7",
+            id: `${tipo}_7`,
             title: "Campeones con Altura",
             description: "Consulta información y horarios."
         },
         {
-            id: "8",
+            id: `${tipo}_8`,
             title: "Educa Parvulitos",
             description: "Consulta información y horarios."
         },
         {
-            id: "9",
+            id: `${tipo}_9`,
             title: "Volver al menú",
             description: "Regresar al menú principal."
         }
@@ -817,32 +817,31 @@ async function procesarWebhook(body) {
 
     const numero = mensaje.from;
 
-    const texto = mensaje.type === "interactive"
-        ? mensaje.interactive?.list_reply?.id || ""
-        : mensaje.text?.body || "";
+let texto = mensaje.text?.body || "";
 
-                await guardarMensaje(numero, "entrada", texto);
+if (mensaje.type === "interactive") {
+    const idSeleccionado =
+        mensaje.interactive?.list_reply?.id || "";
 
-                let respuesta;
-                let estadoAnterior = "inicio";
+    if (idSeleccionado.startsWith("principal_")) {
+        await guardarSesion(numero, "inicio", {});
+        texto = idSeleccionado.replace("principal_", "");
+    }
 
-                try {
-                    const sesionAnterior = await obtenerSesion(numero);
-                    estadoAnterior = sesionAnterior.estado;
+    else if (idSeleccionado.startsWith("horarios_")) {
+        await guardarSesion(numero, "horarios", {});
+        texto = idSeleccionado.replace("horarios_", "");
+    }
 
-                    respuesta = await obtenerRespuesta(numero, texto);
-                } catch (error) {
-                    console.error(
-                        "Error generando respuesta:",
-                        error.message
-                    );
+    else if (idSeleccionado.startsWith("programas_")) {
+        await guardarSesion(numero, "programas", {});
+        texto = idSeleccionado.replace("programas_", "");
+    }
 
-                    respuesta =
-                        "Ocurrió un problema al procesar tu solicitud. Inténtalo nuevamente o escribe MENU.";
-                }
-
-                try {
-    const opcion = texto.trim();
+    else {
+        continue;
+    }
+}
 
     // Enviar la imagen del programa seleccionado en horarios
     if (
