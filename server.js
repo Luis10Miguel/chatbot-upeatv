@@ -804,231 +804,127 @@ app.post("/webhook", (req, res) => {
 
 
 async function procesarWebhook(body) {
-    const entradas = body.entry || [];
-
-    for (const entrada of entradas) {
+    for (const entrada of body.entry || []) {
         for (const cambio of entrada.changes || []) {
-            const mensajes = cambio.value?.messages || [];
+            for (const mensaje of cambio.value?.messages || []) {
+                if (!["text", "interactive"].includes(mensaje.type)) continue;
 
-            for (const mensaje of mensajes) {
-    if (mensaje.type !== "text" && mensaje.type !== "interactive") {
-        continue;
-    }
+                const numero = mensaje.from;
+                let texto = mensaje.text?.body || "";
 
-    const numero = mensaje.from;
+                // Identificar la opción seleccionada en los menús interactivos.
+                if (mensaje.type === "interactive") {
+                    const id = mensaje.interactive?.list_reply?.id || "";
+                    let coincidencia;
 
-let texto = mensaje.text?.body || "";
+                    if ((coincidencia = id.match(/^principal_([1-5])$/))) {
+                        await guardarSesion(numero, "inicio", {});
+                        texto = coincidencia[1];
+                    } else if ((coincidencia = id.match(/^horarios_([1-9])$/))) {
+                        await guardarSesion(numero, "horarios", {});
+                        texto = coincidencia[1];
+                    } else if ((coincidencia = id.match(/^programas_([1-9])$/))) {
+                        await guardarSesion(numero, "programas", {});
+                        texto = coincidencia[1];
+                    } else {
+                        continue;
+                    }
+                }
 
-if (mensaje.type === "interactive") {
-    const idSeleccionado =
-        mensaje.interactive?.list_reply?.id || "";
+                const opcion = texto.trim();
+                const sesion = await obtenerSesion(numero);
+                const estadoAnterior = sesion.estado;
 
-    if (idSeleccionado.startsWith("principal_")) {
-        await guardarSesion(numero, "inicio", {});
-        texto = idSeleccionado.replace("principal_", "");
-    }
+                try {
+                    await guardarMensaje(numero, "entrada", opcion);
+                    const respuesta = await obtenerRespuesta(numero, opcion);
 
-    else if (idSeleccionado.startsWith("horarios_")) {
-        await guardarSesion(numero, "horarios", {});
-        texto = idSeleccionado.replace("horarios_", "");
-    }
+                    if (respuesta === menuPrincipal()) {
+                        await enviarMenuPrincipalWhatsApp(numero);
+                        await guardarMensaje(numero, "salida", "Menú principal interactivo enviado.");
+                    } else if (respuesta === menuProgramas("horarios")) {
+                        await enviarListaProgramasWhatsApp(numero, "horarios");
+                        await guardarMensaje(numero, "salida", "Submenú interactivo de programación y horarios enviado.");
+                    } else if (respuesta === menuProgramas("programas")) {
+                        await enviarListaProgramasWhatsApp(numero, "programas");
+                        await guardarMensaje(numero, "salida", "Submenú interactivo de información de programas enviado.");
+                    } else if (estadoAnterior === "horarios" && /^[1-8]$/.test(opcion)) {
+                        const imagenes = [
+                            "apoyo-legal.jpg",
+                            "mente-corazon.jpg",
+                            "electroingenio.jpg",
+                            "ius-ex-catedra.jpg",
+                            "raices-vivas.jpg",
+                            "toda-mi-gente.jpg",
+                            "campeones-con-altura.jpg",
+                            "educa-parvulitos.jpg"
+                        ];
 
-    else if (idSeleccionado.startsWith("programas_")) {
-        await guardarSesion(numero, "programas", {});
-        texto = idSeleccionado.replace("programas_", "");
-    }
+                        const archivo = imagenes[Number(opcion) - 1];
+                        const urlImagen = `https://chatbot-upeatv.onrender.com/media/${archivo}`;
+                        await enviarImagenWhatsApp(numero, urlImagen, respuesta);
+                        await guardarMensaje(numero, "salida", `Imagen del programa: ${archivo}. ${respuesta}`);
+                    } else {
+                        await enviarWhatsApp(numero, respuesta);
+                        await guardarMensaje(numero, "salida", respuesta);
+                    }
 
-    else {
-        continue;
-    }
-}
-
-    // Enviar la imagen del programa seleccionado en horarios
-    if (
-        estadoAnterior === "horarios" &&
-        /^[1-8]$/.test(opcion)
-    ) {
-        const programasImagenes = [
-            "apoyo-legal.jpg",
-            "mente-corazon.jpg",
-            "electroingenio.jpg",
-            "ius-ex-catedra.jpg",
-            "raices-vivas.jpg",
-            "toda-mi-gente.jpg",
-            "campeones-con-altura.jpg",
-            "educa-parvulitos.jpg"
-        ];
-
-        const indice = Number(opcion) - 1;
-        const archivo = programasImagenes[indice];
-
-        const urlImagen =
-            `https://chatbot-upeatv.onrender.com/media/${archivo}`;
-
-        await enviarImagenWhatsApp(
-            numero,
-            urlImagen,
-            respuesta
-        );
-
-        await guardarMensaje(
-            numero,
-            "salida",
-            `Imagen del programa: ${archivo}. ${respuesta}`
-        );
-    } else {
-        // Para todas las demás opciones, conservar la respuesta normal
-        // Enviar el menú interactivo cuando corresponda
-if (respuesta === menuPrincipal()) {
-    await enviarMenuPrincipalWhatsApp(numero);
-
-    await guardarMensaje(
-        numero,
-        "salida",
-        "Menú principal interactivo enviado."
-    );
-
-} else if (respuesta === menuProgramas("horarios")) {
-    await enviarListaProgramasWhatsApp(numero, "horarios");
-
-    await guardarMensaje(
-        numero,
-        "salida",
-        "Submenú interactivo de programación y horarios enviado."
-    );
-
-} else if (respuesta === menuProgramas("programas")) {
-    await enviarListaProgramasWhatsApp(numero, "programas");
-
-    await guardarMensaje(
-        numero,
-        "salida",
-        "Submenú interactivo de información de programas enviado."
-    );
-
-} else {
-    await enviarWhatsApp(numero, respuesta);
-    await guardarMensaje(numero, "salida", respuesta);
-}
-
-const opcion = texto.trim();
-    }
-
-
-
-                    // OPCIÓN 2: enviar las 16 portadas
-                    if (
-                        estadoAnterior === "inicio" &&
-                        opcion === "2"
-                    ) {
-                        const baseUrl =
-                            "https://chatbot-upeatv.onrender.com/media/periodicos/";
+                    // Portadas de periódicos: opción 2 del menú principal.
+                    if (estadoAnterior === "inicio" && opcion === "2") {
+                        const baseUrl = "https://chatbot-upeatv.onrender.com/media/periodicos/";
 
                         for (let i = 1; i <= 16; i++) {
-                            const urlPortada =
-                                `${baseUrl}periodico${i}.jpg`;
-
                             try {
                                 await enviarImagenWhatsApp(
                                     numero,
-                                    urlPortada,
+                                    `${baseUrl}periodico${i}.jpg`,
                                     `🗞️ Portada del periódico ${i} - UPEA TV`
                                 );
-
-                                await guardarMensaje(
-                                    numero,
-                                    "salida",
-                                    `Portada del periódico ${i}`
-                                );
+                                await guardarMensaje(numero, "salida", `Portada del periódico ${i}`);
                             } catch (error) {
-                                console.error(
-                                    `Error enviando la portada ${i}:`,
-                                    error.message
-                                );
+                                console.error(`Error enviando la portada ${i}:`, error.message);
                             }
                         }
                     }
 
-                    // OPCIÓN 4: enviar el video y las fotos
-                    if (
-                        estadoAnterior === "inicio" &&
-                        opcion === "4"
-                    ) {
-                        const baseUrl =
-                            "https://chatbot-upeatv.onrender.com/media/ubicacion/";
+                    // Video y fotografías: opción 4 del menú principal.
+                    if (estadoAnterior === "inicio" && opcion === "4") {
+                        const baseUrl = "https://chatbot-upeatv.onrender.com/media/ubicacion/";
 
-                        // Enviar video de cómo llegar
                         try {
                             await enviarVideoWhatsApp(
                                 numero,
                                 `${baseUrl}video1.mp4`,
                                 "📍 ¿Cómo llegar a UPEA TV? Mira este video para conocer el recorrido hasta nuestras instalaciones."
                             );
-
-                            await guardarMensaje(
-                                numero,
-                                "salida",
-                                "Video de cómo llegar a UPEA TV"
-                            );
+                            await guardarMensaje(numero, "salida", "Video de cómo llegar a UPEA TV");
                         } catch (error) {
-                            console.error(
-                                "Error enviando el video:",
-                                error.message
-                            );
+                            console.error("Error enviando el video:", error.message);
                         }
 
-                        // Enviar fotografías de la entrada
                         const fotos = [
-                            {
-                                archivo: "fotoentrada1.jpg",
-                                descripcion: "📸 Entrada de UPEA TV - Foto 1"
-                            },
-                            {
-                                archivo: "fotoentrada2.jpg",
-                                descripcion: "📸 Referencia de ingreso - Foto 2"
-                            },
-                            {
-                                archivo: "fotoentrada3.jpg",
-                                descripcion: "📸 Referencia de ingreso - Foto 3"
-                            },
-                            {
-                                archivo: "fotoentrada4.jpg",
-                                descripcion: "📸 Referencia de ingreso - Foto 4"
-                            }
+                            { archivo: "fotoentrada1.jpg", descripcion: "📸 Entrada de UPEA TV - Foto 1" },
+                            { archivo: "fotoentrada2.jpg", descripcion: "📸 Referencia de ingreso - Foto 2" },
+                            { archivo: "fotoentrada3.jpg", descripcion: "📸 Referencia de ingreso - Foto 3" },
+                            { archivo: "fotoentrada4.jpg", descripcion: "📸 Referencia de ingreso - Foto 4" }
                         ];
 
                         for (const foto of fotos) {
                             try {
-                                await enviarImagenWhatsApp(
-                                    numero,
-                                    `${baseUrl}${foto.archivo}`,
-                                    foto.descripcion
-                                );
-
-                                await guardarMensaje(
-                                    numero,
-                                    "salida",
-                                    foto.descripcion
-                                );
+                                await enviarImagenWhatsApp(numero, `${baseUrl}${foto.archivo}`, foto.descripcion);
+                                await guardarMensaje(numero, "salida", foto.descripcion);
                             } catch (error) {
-                                console.error(
-                                    `Error enviando ${foto.archivo}:`,
-                                    error.message
-                                );
+                                console.error(`Error enviando ${foto.archivo}:`, error.message);
                             }
                         }
                     }
                 } catch (error) {
-                    console.error(
-                        "Error enviando respuesta de WhatsApp:",
-                        error.message
-                    );
+                    console.error("Error procesando mensaje de WhatsApp:", error.message);
                 }
             }
         }
     }
 }
-
 
 app.get("/db-test", async (req, res) => {
     try {
