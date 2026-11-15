@@ -559,6 +559,72 @@ async function enviarListaProgramasWhatsApp(numero, tipo) {
 
     return resultado;
 }
+
+async function enviarMenuAdministradorWhatsApp(numero) {
+    const version = process.env.GRAPH_API_VERSION || "v26.0";
+    const endpoint =
+        `https://graph.facebook.com/${version}/${process.env.PHONE_NUMBER_ID}/messages`;
+
+    const respuesta = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: numero,
+            type: "interactive",
+            interactive: {
+                type: "list",
+                body: {
+                    text: "¡Estamos aquí para ayudarte! 👋\n\nSelecciona una opción para continuar."
+                },
+                action: {
+                    button: "Ver opciones",
+                    sections: [
+                        {
+                            title: "Atención al usuario",
+                            rows: [
+                                {
+                                    id: "admin_1",
+                                    title: "❓ Preguntas frecuentes",
+                                    description: "Resuelve tus dudas sobre UPEA TV."
+                                },
+                                {
+                                    id: "admin_2",
+                                    title: "📝 Dejar una consulta",
+                                    description: "Envía un mensaje al equipo de UPEA TV."
+                                },
+                                {
+                                    id: "admin_3",
+                                    title: "🌐 Redes y contactos",
+                                    description: "Consulta nuestras redes y contactos."
+                                },
+                                {
+                                    id: "admin_4",
+                                    title: "↩️ Volver al menú",
+                                    description: "Regresar al menú principal."
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        })
+    });
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok) {
+        console.error("Error enviando menú de administrador:", resultado);
+        throw new Error("No se pudo enviar el menú interactivo de administrador.");
+    }
+
+    return resultado;
+}
+
 async function enviarImagenWhatsApp(numero, url, descripcion) {
     return enviarMultimediaWhatsApp(numero, "image", url, descripcion);
 }
@@ -823,12 +889,19 @@ async function procesarWebhook(body) {
                     } else if ((coincidencia = id.match(/^horarios_([1-9])$/))) {
                         await guardarSesion(numero, "horarios", {});
                         texto = coincidencia[1];
-                    } else if ((coincidencia = id.match(/^programas_([1-9])$/))) {
-                        await guardarSesion(numero, "programas", {});
-                        texto = coincidencia[1];
-                    } else {
-                        continue;
-                    }
+                    
+} else if ((coincidencia = id.match(/^programas_([1-9])$/))) {
+    await guardarSesion(numero, "programas", {});
+    texto = coincidencia[1];
+
+} else if ((coincidencia = id.match(/^admin_([1-4])$/))) {
+    await guardarSesion(numero, "administrador", {});
+    texto = coincidencia[1];
+
+} else {
+    continue;
+}
+
                 }
 
                 const opcion = texto.trim();
@@ -845,10 +918,17 @@ async function procesarWebhook(body) {
                     } else if (respuesta === menuProgramas("horarios")) {
                         await enviarListaProgramasWhatsApp(numero, "horarios");
                         await guardarMensaje(numero, "salida", "Submenú interactivo de programación y horarios enviado.");
-                    } else if (respuesta === menuProgramas("programas")) {
-                        await enviarListaProgramasWhatsApp(numero, "programas");
-                        await guardarMensaje(numero, "salida", "Submenú interactivo de información de programas enviado.");
-                    } else if (estadoAnterior === "horarios" && /^[1-8]$/.test(opcion)) {
+                    
+} else if (respuesta === menuProgramas("programas")) {
+    await enviarListaProgramasWhatsApp(numero, "programas");
+    await guardarMensaje(numero, "salida", "Submenú interactivo de información de programas enviado.");
+
+} else if (respuesta === menuAdministrador()) {
+    await enviarMenuAdministradorWhatsApp(numero);
+    await guardarMensaje(numero, "salida", "Menú interactivo de administrador enviado.");
+
+} else if (estadoAnterior === "horarios" && /^[1-8]$/.test(opcion)) {
+
                         const imagenes = [
                             "apoyo-legal.jpg",
                             "mente-corazon.jpg",
