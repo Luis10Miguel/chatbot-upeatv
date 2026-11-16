@@ -957,7 +957,7 @@ async function procesarWebhook(body) {
                             try {
                                 await enviarImagenWhatsApp(
                                     numero,
-                                    `${baseUrl}periodico${i}.jpg`,
+                                    `${baseUrl}periodico${i}.jpeg`,
                                     `🗞️ Portada del periódico ${i} - UPEA TV`
                                 );
                                 await guardarMensaje(numero, "salida", `Portada del periódico ${i}`);
