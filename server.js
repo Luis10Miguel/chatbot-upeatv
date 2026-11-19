@@ -2,12 +2,15 @@
 require("dotenv").config();
 
 const express = require("express");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 
 const app = express();
-app.use(express.json());
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "2mb" }));
 const path = require("path");
 
+app.use(express.static(path.join(__dirname, "public")));
 app.use("/media", express.static(path.join(__dirname, "public")));
 app.use("/media", express.static(path.join(__dirname, "media")));
 const PORT = process.env.PORT || 3000;
@@ -17,15 +20,113 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
+const ADMIN_COOKIE = "upea_admin_session";
+const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
+const ADMIN_CATEGORIES = ["programa", "menu", "noticia", "faq", "contacto"];
+const loginAttempts = new Map();
+let contenidoCache = { menu: {}, noticias: [], faqs: [], contacto: {} };
+
+function firmarSesion(payload) {
+    const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+    const firma = crypto.createHmac("sha256", process.env.ADMIN_SESSION_SECRET).update(data).digest("base64url");
+    return `${data}.${firma}`;
+}
+
+function validarSesion(token) {
+    if (!token || !process.env.ADMIN_SESSION_SECRET) return false;
+    const partes = token.split(".");
+    if (partes.length !== 2) return false;
+    const firmaEsperada = crypto.createHmac("sha256", process.env.ADMIN_SESSION_SECRET).update(partes[0]).digest();
+    let firmaRecibida;
+    try { firmaRecibida = Buffer.from(partes[1], "base64url"); } catch { return false; }
+    if (firmaRecibida.length !== firmaEsperada.length || !crypto.timingSafeEqual(firmaRecibida, firmaEsperada)) return false;
+    try {
+        const payload = JSON.parse(Buffer.from(partes[0], "base64url").toString("utf8"));
+        return payload.usuario === process.env.ADMIN_USER && payload.exp > Date.now();
+    } catch { return false; }
+}
+
+function exigirAdministrador(req, res, next) {
+    const token = req.cookies?.[ADMIN_COOKIE] || req.headers.cookie?.split(";").map(x => x.trim()).find(x => x.startsWith(`${ADMIN_COOKIE}=`))?.slice(ADMIN_COOKIE.length + 1);
+    if (!validarSesion(token)) return res.status(401).json({ error: "Sesión no válida. Inicia sesión nuevamente." });
+    next();
+}
+
+function leerContenido(contenido) {
+    try { return JSON.parse(contenido); } catch { return contenido; }
+}
+
+async function cargarContenidoBot() {
+    const r = await pool.query("SELECT id, categoria, titulo, contenido, activo, orden FROM contenido_bot ORDER BY orden, id");
+    const filas = r.rows.filter(x => x.activo);
+    const porCategoria = categoria => filas.filter(x => x.categoria === categoria);
+
+    const programasDB = porCategoria("programa");
+    {
+        const lista = programasDB.map(x => {
+            const data = leerContenido(x.contenido);
+            return { nombre: x.titulo, dia: data.dia || "Horario pendiente de confirmación", horario: data.horario || "Horario pendiente de confirmación", redes: data.redes || "Enlace pendiente de confirmación", contacto: data.contacto || "Contacto pendiente de confirmación", descripcion: data.descripcion || "", grabaciones: Array.isArray(data.grabaciones) ? data.grabaciones : [] };
+        });
+        programas.splice(0, programas.length, ...lista);
+    }
+
+    contenidoCache.menu = {};
+    for (const x of porCategoria("menu")) contenidoCache.menu[x.titulo] = x.contenido;
+    contenidoCache.noticias = porCategoria("noticia").map(x => ({ id: x.id, nombre: x.titulo, ...((leerContenido(x.contenido) && typeof leerContenido(x.contenido) === "object") ? leerContenido(x.contenido) : { url: x.contenido }) }));
+    contenidoCache.faqs = porCategoria("faq").map(x => ({ id: x.id, pregunta: x.titulo, respuesta: x.contenido }));
+    contenidoCache.contacto = {};
+    for (const x of porCategoria("contacto")) contenidoCache.contacto[x.titulo] = x.contenido;
+}
+
+async function inicializarContenidoBot() {
+    const contar = async categoria => {
+        const r = await pool.query("SELECT COUNT(*)::int AS total FROM contenido_bot WHERE categoria = $1", [categoria]);
+        return r.rows[0].total;
+    };
+
+    if ((await contar("programa")) === 0) {
+        for (let i = 0; i < programas.length; i++) {
+            const p = programas[i];
+            const data = { dia: p.dia, horario: p.horario, redes: p.redes, contacto: p.contacto, descripcion: p.descripcion, grabaciones: p.grabaciones };
+            await pool.query("INSERT INTO contenido_bot (categoria, titulo, contenido, activo, orden) VALUES ('programa', $1, $2, TRUE, $3)", [p.nombre, JSON.stringify(data), i + 1]);
+        }
+    }
+    if ((await contar("menu")) === 0) {
+        const menus = [
+            ["principal", menuPrincipal()],
+            ["noticias", "📰 *NOTICIAS Y NOVEDADES*\n\n¡Mantente informado con UPEA TV!\n\nEstas son las portadas de los periódicos disponibles. 🗞️\n\nEscribe 0 para volver al menú principal."],
+            ["contacto", "📍 *UBICACIÓN Y CONTACTO*"],
+            ["redes", "🌐 *REDES SOCIALES Y CONTACTOS*"],
+            ["admin", "¡Estamos aquí para ayudarte! 👋\n\nSelecciona una opción para continuar."]
+        ];
+        for (let i = 0; i < menus.length; i++) await pool.query("INSERT INTO contenido_bot (categoria, titulo, contenido, activo, orden) VALUES ('menu', $1, $2, TRUE, $3)", [menus[i][0], menus[i][1], i + 1]);
+    }
+    if ((await contar("contacto")) === 0) {
+        const contacts = [["facebook", FACEBOOK], ["tiktok", TIKTOK], ["youtube", YOUTUBE], ["web", WEB], ["correo", CORREO], ["maps", MAPS]];
+        for (let i = 0; i < contacts.length; i++) await pool.query("INSERT INTO contenido_bot (categoria, titulo, contenido, activo, orden) VALUES ('contacto', $1, $2, TRUE, $3)", [contacts[i][0], contacts[i][1], i + 1]);
+    }
+    if ((await contar("faq")) === 0) {
+        const faqs = [
+            ["¿Cómo puedo conocer los horarios de los programas?", "Consulta la opción Programación y horarios del menú principal."],
+            ["¿Dónde puedo ver las grabaciones?", "Ingresa a Información de programas."],
+            ["¿Cómo puedo consultar las portadas de los periódicos?", "Selecciona Noticias y novedades."],
+            ["¿Cómo puedo llegar a UPEA TV?", "Consulta Ubicación y contacto."],
+            ["¿Cómo puedo contactar con UPEA TV?", "Consulta nuestras redes sociales y correo electrónico."]
+        ];
+        for (let i = 0; i < faqs.length; i++) await pool.query("INSERT INTO contenido_bot (categoria, titulo, contenido, activo, orden) VALUES ('faq', $1, $2, TRUE, $3)", [faqs[i][0], faqs[i][1], i + 1]);
+    }
+    if ((await contar("noticia")) === 0) {
+        for (let i = 1; i <= 16; i++) await pool.query("INSERT INTO contenido_bot (categoria, titulo, contenido, activo, orden) VALUES ('noticia', $1, $2, TRUE, $3)", [`Periódico ${i}`, JSON.stringify({ url: "" }), i]);
+    }
+    await cargarContenidoBot();
+}
+
 const FACEBOOK = "https://www.facebook.com/upeatelevisioncanal25";
 const TIKTOK = "https://www.tiktok.com/@upeatelevisionoficial";
 const YOUTUBE = "https://www.youtube.com/@UPEATELEVISI%C3%93NOFICIAL";
 const WEB = "https://tv.upea.bo/";
 const CORREO = "upeatelevisioncanal25@gmail.com";
 const MAPS = "https://maps.app.goo.gl/LfoYfLBZW5JiC6Vm8";
-const NUMERO_OPERADOR = "59162442321";
-
-const LINK_OPERADOR = `https://wa.me/${NUMERO_OPERADOR}?text=${encodeURIComponent("Hola, necesito comunicarme con UPEA TV.")}`;
 
 const programas = [
     {
@@ -75,9 +176,9 @@ const programas = [
     },
     {
         nombre: "Toda Mi Gente",
-        dia: "Horario pendiente de confirmación",
-        horario: "Horario pendiente de confirmación",
-        redes: "Enlace pendiente de confirmación",
+        dia: "LUNES A VIERNES",
+        horario: "10:30 A 12:30",
+        redes: "https://www.facebook.com/todamigentetv/",
         contacto: "Contacto pendiente de confirmación",
         descripcion: "Descripción pendiente de confirmación.",
         grabaciones: []
@@ -108,6 +209,7 @@ const periodicos = Array.from({ length: 16 }, (_, i) => ({
 }));
 
 function menuPrincipal() {
+    if (contenidoCache.menu?.principal) return contenidoCache.menu.principal;
     return `📺 *ASISTENTE VIRTUAL DE UPEA TV*
 
 ¡Hola! 👋
@@ -158,6 +260,7 @@ ${p.contacto}
 
 
 function menuNoticias() {
+    if (contenidoCache.menu?.noticias) return contenidoCache.menu.noticias;
     return `📰 *NOTICIAS Y NOVEDADES*
 
 ¡Mantente informado con UPEA TV!
@@ -188,19 +291,23 @@ ${p.descripcion}
 ${grabaciones}
 
 🔗 Página oficial de Facebook de UPEA TV:
-${FACEBOOK}
+${contenidoCache.contacto?.facebook || FACEBOOK}
 
 0. Volver al menú principal`;
 }
 
 function menuContacto() {
-    return `📍 *UBICACIÓN Y CONTACTO*
+    const c = contenidoCache.contacto || {};
+    const encabezado = contenidoCache.menu?.contacto || "📍 *UBICACIÓN Y CONTACTO*";
+    const facebook = c.facebook || FACEBOOK, tiktok = c.tiktok || TIKTOK, youtube = c.youtube || YOUTUBE;
+    const web = c.web || WEB, correo = c.correo || CORREO, maps = c.maps || MAPS;
+    return `${encabezado}
 
 📺 ¡Visítanos! Te mostramos cómo llegar a UPEA TV.
 
 📍 *Ubicación del canal*
 🔗 Google Maps:
-${MAPS}
+${maps}
 
 🎥 *Video de cómo llegar*
 A continuación recibirás un video para orientarte.
@@ -211,25 +318,25 @@ También te enviaremos fotografías de referencia.
 📞 *Contactos y redes sociales*
 
 📘 Facebook:
-${FACEBOOK}
+${facebook}
 
 🎵 TikTok:
-${TIKTOK}
+${tiktok}
 
 ▶️ YouTube:
-${YOUTUBE}
+${youtube}
 
 🌐 Página web:
-${WEB}
+${web}
 
 ✉️ Correo electrónico:
-${CORREO}
+${correo}
 
 0. Volver al menú principal`;
 }
 
 function menuAdministrador() {
-    return `💬 *CONTACTAR CON UN ADMINISTRADOR*
+    return contenidoCache.menu?.admin || `💬 *CONTACTAR CON UN ADMINISTRADOR*
 
 ¡Estamos aquí para ayudarte! 👋
 
@@ -238,11 +345,11 @@ Selecciona una opción:
 1. ❓ Preguntas frecuentes
 2. 📝 Dejar una consulta para el equipo de UPEA TV
 3. 🌐 Ver nuestras redes sociales y contactos
-4. 📞 Hablar por llamada con un operador
-5. ↩️ Volver al menú principal`;
+4. Volver al menú principal`;
 }
 
 function preguntasFrecuentes() {
+    if (contenidoCache.faqs?.length) return `❓ *PREGUNTAS FRECUENTES*\n\n${contenidoCache.faqs.map((x, i) => `${i + 1}. ${x.pregunta}\n${x.respuesta}`).join("\n\n")}\n\n${contenidoCache.faqs.length + 1}. Volver al menú de administrador`;
     return `❓ *PREGUNTAS FRECUENTES*
 
 1. ¿Cómo puedo conocer los horarios de los programas?
@@ -264,22 +371,24 @@ Consulta las redes sociales y el correo electrónico en Ubicación y contacto.
 }
 
 function menuRedes() {
-    return `🌐 *REDES SOCIALES Y CONTACTOS*
+    const c = contenidoCache.contacto || {};
+    const encabezado = contenidoCache.menu?.redes || "🌐 *REDES SOCIALES Y CONTACTOS*";
+    return `${encabezado}
 
 📘 Facebook:
-${FACEBOOK}
+${c.facebook || FACEBOOK}
 
 🎵 TikTok:
-${TIKTOK}
+${c.tiktok || TIKTOK}
 
 ▶️ YouTube:
-${YOUTUBE}
+${c.youtube || YOUTUBE}
 
 🌐 Página web:
-${WEB}
+${c.web || WEB}
 
 ✉️ Correo electrónico:
-${CORREO}
+${c.correo || CORREO}
 
 0. Volver al menú principal`;
 }
@@ -418,7 +527,7 @@ async function enviarMenuPrincipalWhatsApp(numero) {
             interactive: {
                 type: "list",
                 body: {
-                    text: "¡Hola! 👋 Bienvenido al asistente virtual de UPEA TV 📺\n\n¿En qué podemos ayudarte? Selecciona una opción del menú."
+                    text: contenidoCache.menu?.principal || "¡Hola! 👋 Bienvenido al asistente virtual de UPEA TV 📺\n\n¿En qué podemos ayudarte? Selecciona una opción del menú."
                 },
                 action: {
                     button: "Abrir menú",
@@ -477,53 +586,16 @@ async function enviarListaProgramasWhatsApp(numero, tipo) {
         ? "Programación y horarios"
         : "Información de programas";
 
-    const filas = [
-        {
-            id: `${tipo}_1`,
-            title: "Apoyo Legal",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_2`,
-            title: "Mente y Corazón",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_3`,
-            title: "ElectroIngenio",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_4`,
-            title: "IUS EX Catedrá",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_5`,
-            title: "Raíces Vivas",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_6`,
-            title: "Toda Mi Gente",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_7`,
-            title: "Campeones con Altura",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_8`,
-            title: "Educa Parvulitos",
-            description: "Consulta información y horarios."
-        },
-        {
-            id: `${tipo}_9`,
-            title: "Volver al menú",
-            description: "Regresar al menú principal."
-        }
-    ];
+    const filas = programas.slice(0, 8).map((programa, indice) => ({
+        id: `${tipo}_${indice + 1}`,
+        title: programa.nombre.slice(0, 24),
+        description: "Consulta información y horarios."
+    }));
+    filas.push({
+        id: `${tipo}_9`,
+        title: "Volver al menú",
+        description: "Regresar al menú principal."
+    });
 
     const respuesta = await fetch(endpoint, {
         method: "POST",
@@ -566,7 +638,6 @@ async function enviarListaProgramasWhatsApp(numero, tipo) {
 
 async function enviarMenuAdministradorWhatsApp(numero) {
     const version = process.env.GRAPH_API_VERSION || "v26.0";
-
     const endpoint =
         `https://graph.facebook.com/${version}/${process.env.PHONE_NUMBER_ID}/messages`;
 
@@ -584,7 +655,7 @@ async function enviarMenuAdministradorWhatsApp(numero) {
             interactive: {
                 type: "list",
                 body: {
-                    text: "¡Estamos aquí para ayudarte! 👋\n\nSelecciona una opción para continuar."
+                    text: contenidoCache.menu?.admin || "¡Estamos aquí para ayudarte! 👋\n\nSelecciona una opción para continuar."
                 },
                 action: {
                     button: "Ver opciones",
@@ -605,15 +676,10 @@ async function enviarMenuAdministradorWhatsApp(numero) {
                                 {
                                     id: "admin_3",
                                     title: "🌐 Redes y contactos",
-                                    description: "Consulta nuestras redes sociales."
+                                    description: "Consulta nuestras redes y contactos."
                                 },
                                 {
                                     id: "admin_4",
-                                    title: "📞 Hablar por llamada",
-                                    description: "Contacta directamente al operador."
-                                },
-                                {
-                                    id: "admin_5",
                                     title: "↩️ Volver al menú",
                                     description: "Regresar al menú principal."
                                 }
@@ -773,48 +839,28 @@ async function obtenerRespuesta(numero, texto) {
     }
 
     if (estado === "administrador") {
+        if (normalizado === "1") {
+            await guardarSesion(numero, "faq", {});
+            return preguntasFrecuentes();
+        }
 
-    if (normalizado === "1") {
-        await guardarSesion(numero, "faq", {});
-        return preguntasFrecuentes();
+        if (normalizado === "2") {
+            await guardarSesion(numero, "consulta_nombre", {});
+            return `📝 *DEJAR UNA CONSULTA*\n\nPor favor, escribe tu nombre.`;
+        }
+
+        if (normalizado === "3") {
+            await guardarSesion(numero, "redes", {});
+            return menuRedes();
+        }
+
+        if (normalizado === "4") {
+            await guardarSesion(numero, "inicio", {});
+            return menuPrincipal();
+        }
+
+        return menuAdministrador();
     }
-
-    if (normalizado === "2") {
-        await guardarSesion(numero, "consulta_nombre", {});
-        return `📝 *DEJAR UNA CONSULTA*\n\nPor favor, escribe tu nombre.`;
-    }
-
-    if (normalizado === "3") {
-        await guardarSesion(numero, "redes", {});
-        return menuRedes();
-    }
-
-    if (normalizado === "4") {
-        await guardarSesion(numero, "administrador", {});
-
-        return `📞 *CONTACTAR CON EL OPERADOR DE UPEA TV*
-
-Puedes comunicarte directamente con nuestro operador mediante WhatsApp.
-
-📱 Número: +591 62442321
-
-🔗 Abre este enlace para iniciar el chat:
-${LINK_OPERADOR}
-
-Cuando se abra WhatsApp, pulsa el icono de llamada para realizar la llamada de voz.
-
-*Importante:* la llamada la iniciarás tú desde tu WhatsApp. El chatbot no transfiere automáticamente una llamada entrante.
-
-Escribe MENU para volver al menú principal.`;
-    }
-
-    if (normalizado === "5") {
-        await guardarSesion(numero, "inicio", {});
-        return menuPrincipal();
-    }
-
-    return menuAdministrador();
-}
 
     if (estado === "faq") {
         await guardarSesion(numero, "administrador", {});
@@ -874,8 +920,116 @@ Escribe MENU para volver al menú principal.`;
     return menuPrincipal();
 }
 
+// ---------------- PANEL ADMINISTRATIVO UPEA TV ----------------
+app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
+app.get("/api/admin/session", (req, res) => {
+    const raw = req.headers.cookie || "";
+    const token = raw.split(";").map(x => x.trim()).find(x => x.startsWith(`${ADMIN_COOKIE}=`))?.slice(ADMIN_COOKIE.length + 1);
+    res.json({ autenticado: validarSesion(token) });
+});
+
+app.post("/api/admin/login", (req, res) => {
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    const ahora = Date.now();
+    const intento = loginAttempts.get(ip) || { count: 0, until: ahora + 15 * 60 * 1000 };
+    if (ahora > intento.until) { intento.count = 0; intento.until = ahora + 15 * 60 * 1000; }
+    if (intento.count >= 8) return res.status(429).json({ error: "Demasiados intentos. Espera 15 minutos." });
+
+    const usuario = String(req.body.usuario || "");
+    const password = String(req.body.password || "");
+    const realUser = String(process.env.ADMIN_USER || "");
+    const realPassword = String(process.env.ADMIN_PASSWORD || "");
+    const iguales = (a, b) => {
+        const aa = Buffer.from(a), bb = Buffer.from(b);
+        return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+    };
+    if (!realUser || !realPassword || !process.env.ADMIN_SESSION_SECRET) {
+        return res.status(500).json({ error: "Configura ADMIN_USER, ADMIN_PASSWORD y ADMIN_SESSION_SECRET en las variables de entorno." });
+    }
+    if (!iguales(usuario, realUser) || !iguales(password, realPassword)) {
+        intento.count++;
+        loginAttempts.set(ip, intento);
+        return res.status(401).json({ error: "Usuario o contraseña incorrectos." });
+    }
+    loginAttempts.delete(ip);
+    const token = firmarSesion({ usuario: realUser, exp: Date.now() + ADMIN_SESSION_MS });
+    res.cookie(ADMIN_COOKIE, token, { httpOnly: true, secure: req.secure, sameSite: "strict", maxAge: ADMIN_SESSION_MS, path: "/" });
+    res.json({ ok: true, mensaje: "Sesión iniciada." });
+});
+
+app.post("/api/admin/logout", exigirAdministrador, (req, res) => {
+    res.clearCookie(ADMIN_COOKIE, { httpOnly: true, secure: req.secure, sameSite: "strict", path: "/" });
+    res.json({ ok: true });
+});
+
+app.get("/api/admin/dashboard", exigirAdministrador, async (req, res) => {
+    try {
+        const r = await pool.query("SELECT categoria, COUNT(*)::int AS total FROM contenido_bot WHERE activo = TRUE GROUP BY categoria");
+        const counts = Object.fromEntries(r.rows.map(x => [x.categoria, x.total]));
+        const q = await pool.query("SELECT COUNT(*)::int AS total FROM consultas_bot WHERE estado = 'pendiente'");
+        res.json({ programas: counts.programa || 0, noticias: counts.noticia || 0, preguntas: counts.faq || 0, consultasPendientes: q.rows[0].total || 0 });
+    } catch (e) { res.status(500).json({ error: "No se pudo cargar el resumen." }); }
+});
+
+app.get("/api/admin/content", exigirAdministrador, async (req, res) => {
+    const categoria = String(req.query.categoria || "");
+    if (!ADMIN_CATEGORIES.includes(categoria)) return res.status(400).json({ error: "Categoría no válida." });
+    try {
+        const r = await pool.query("SELECT id, categoria, titulo, contenido, activo, orden, actualizado_en FROM contenido_bot WHERE categoria = $1 ORDER BY orden, id", [categoria]);
+        res.json(r.rows.map(x => ({ ...x, contenido: leerContenido(x.contenido) })));
+    } catch (e) { res.status(500).json({ error: "No se pudo consultar el contenido." }); }
+});
+
+app.post("/api/admin/content", exigirAdministrador, async (req, res) => {
+    const { categoria, titulo, contenido, activo = true, orden = 1 } = req.body || {};
+    if (!ADMIN_CATEGORIES.includes(categoria)) return res.status(400).json({ error: "Categoría no válida." });
+    if (!String(titulo || "").trim()) return res.status(400).json({ error: "El título es obligatorio." });
+    if (categoria === "programa" && String(titulo).trim().length > 24) return res.status(400).json({ error: "El nombre del programa debe tener como máximo 24 caracteres para WhatsApp." });
+    if (categoria === "programa") {
+        const total = await pool.query("SELECT COUNT(*)::int AS total FROM contenido_bot WHERE categoria='programa' AND activo=TRUE");
+        if (total.rows[0].total >= 8) return res.status(400).json({ error: "WhatsApp permite hasta 8 programas en este menú. Elimina o desactiva uno antes de agregar otro." });
+    }
+    const texto = typeof contenido === "string" ? contenido : JSON.stringify(contenido ?? {});
+    try {
+        const r = await pool.query("INSERT INTO contenido_bot (categoria, titulo, contenido, activo, orden, actualizado_en) VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP) RETURNING id", [categoria, String(titulo).trim(), texto, Boolean(activo), Number(orden) || 1]);
+        await cargarContenidoBot();
+        res.status(201).json({ ok: true, id: r.rows[0].id });
+    } catch (e) { res.status(500).json({ error: "No se pudo guardar el registro." }); }
+});
+
+app.put("/api/admin/content/:id", exigirAdministrador, async (req, res) => {
+    const id = Number(req.params.id);
+    const { titulo, contenido, activo = true, orden = 1 } = req.body || {};
+    if (!Number.isInteger(id) || id < 1 || !String(titulo || "").trim()) return res.status(400).json({ error: "Datos no válidos." });
+    const existente = await pool.query("SELECT categoria FROM contenido_bot WHERE id=$1", [id]);
+    if (!existente.rowCount) return res.status(404).json({ error: "Registro no encontrado." });
+    if (existente.rows[0].categoria === "programa" && String(titulo).trim().length > 24) return res.status(400).json({ error: "El nombre del programa debe tener como máximo 24 caracteres para WhatsApp." });
+    if (existente.rows[0].categoria === "programa" && Boolean(req.body.activo) === true) {
+        const total = await pool.query("SELECT COUNT(*)::int AS total FROM contenido_bot WHERE categoria='programa' AND activo=TRUE AND id<>$1", [id]);
+        if (total.rows[0].total >= 8) return res.status(400).json({ error: "WhatsApp permite hasta 8 programas activos en este menú." });
+    }
+    const texto = typeof contenido === "string" ? contenido : JSON.stringify(contenido ?? {});
+    try {
+        const r = await pool.query("UPDATE contenido_bot SET titulo=$1, contenido=$2, activo=$3, orden=$4, actualizado_en=CURRENT_TIMESTAMP WHERE id=$5 RETURNING id", [String(titulo).trim(), texto, Boolean(activo), Number(orden) || 1, id]);
+        if (!r.rowCount) return res.status(404).json({ error: "Registro no encontrado." });
+        await cargarContenidoBot();
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: "No se pudo actualizar el registro." }); }
+});
+
+app.delete("/api/admin/content/:id", exigirAdministrador, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "Identificador no válido." });
+    try {
+        const r = await pool.query("DELETE FROM contenido_bot WHERE id=$1 AND categoria = ANY($2::varchar[])", [id, ADMIN_CATEGORIES]);
+        if (!r.rowCount) return res.status(404).json({ error: "Registro no encontrado." });
+        await cargarContenidoBot();
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: "No se pudo eliminar el registro." }); }
+});
+
 app.get("/", (req, res) => {
-    res.send("Chatbot UPEA TV funcionando correctamente.");
+    res.send("Chatbot UPEA TV funcionando correctamente. Panel: /admin");
 });
 
 app.get("/webhook", (req, res) => {
@@ -924,7 +1078,7 @@ async function procesarWebhook(body) {
     await guardarSesion(numero, "programas", {});
     texto = coincidencia[1];
 
-} else if ((coincidencia = id.match(/^admin_([1-5])$/))) {
+} else if ((coincidencia = id.match(/^admin_([1-4])$/))) {
     await guardarSesion(numero, "administrador", {});
     texto = coincidencia[1];
 
@@ -959,21 +1113,26 @@ async function procesarWebhook(body) {
 
 } else if (estadoAnterior === "horarios" && /^[1-8]$/.test(opcion)) {
 
-                        const imagenes = [
-                            "apoyo-legal.jpg",
-                            "mente-corazon.jpg",
-                            "electroingenio.jpg",
-                            "ius-ex-catedra.jpg",
-                            "raices-vivas.jpg",
-                            "toda-mi-gente.jpg",
-                            "campeones-con-altura.jpg",
-                            "educa-parvulitos.jpg"
-                        ];
-
-                        const archivo = imagenes[Number(opcion) - 1];
-                        const urlImagen = `https://chatbot-upeatv.onrender.com/media/${archivo}`;
-                        await enviarImagenWhatsApp(numero, urlImagen, respuesta);
-                        await guardarMensaje(numero, "salida", `Imagen del programa: ${archivo}. ${respuesta}`);
+                        const imagenes = {
+                            "Apoyo Legal": "apoyo-legal.jpg",
+                            "Mente y Corazón": "mente-corazon.jpg",
+                            "ElectroIngenio": "electroingenio.jpg",
+                            "IUS EX Catedrá": "ius-ex-catedra.jpg",
+                            "Raíces Vivas": "raices-vivas.jpg",
+                            "Toda Mi Gente": "toda-mi-gente.jpg",
+                            "Campeones con Altura": "campeones-con-altura.jpg",
+                            "Educa Parvulitos": "educa-parvulitos.jpg"
+                        };
+                        const programaSeleccionado = programas[Number(opcion) - 1];
+                        const archivo = imagenes[programaSeleccionado?.nombre];
+                        if (archivo) {
+                            const urlImagen = `https://chatbot-upeatv.onrender.com/media/${archivo}`;
+                            await enviarImagenWhatsApp(numero, urlImagen, respuesta);
+                            await guardarMensaje(numero, "salida", `Imagen del programa: ${archivo}. ${respuesta}`);
+                        } else {
+                            await enviarWhatsApp(numero, respuesta);
+                            await guardarMensaje(numero, "salida", respuesta);
+                        }
                     } else {
                         await enviarWhatsApp(numero, respuesta);
                         await guardarMensaje(numero, "salida", respuesta);
@@ -982,17 +1141,15 @@ async function procesarWebhook(body) {
                     // Portadas de periódicos: opción 2 del menú principal.
                     if (estadoAnterior === "inicio" && opcion === "2") {
                         const baseUrl = "https://chatbot-upeatv.onrender.com/media/periodicos/";
-
-                        for (let i = 1; i <= 16; i++) {
+                        const portadas = contenidoCache.noticias || [];
+                        for (let i = 0; i < portadas.length; i++) {
                             try {
-                                await enviarImagenWhatsApp(
-                                    numero,
-                                    `${baseUrl}periodico${i}.jpeg`,
-                                    `🗞️ Portada del periódico ${i} - UPEA TV`
-                                );
-                                await guardarMensaje(numero, "salida", `Portada del periódico ${i}`);
+                                const urlPortada = portadas[i].url || `${baseUrl}periodico${i + 1}.jpeg`;
+                                if (!urlPortada) continue;
+                                await enviarImagenWhatsApp(numero, urlPortada, `🗞️ ${portadas[i].nombre} - UPEA TV`);
+                                await guardarMensaje(numero, "salida", `Portada: ${portadas[i].nombre}`);
                             } catch (error) {
-                                console.error(`Error enviando la portada ${i}:`, error.message);
+                                console.error(`Error enviando portada ${i + 1}:`, error.message);
                             }
                         }
                     }
@@ -1050,12 +1207,15 @@ app.get("/db-test", async (req, res) => {
 });
 
 prepararBaseDatos()
+    .then(inicializarContenidoBot)
     .then(() => {
         app.listen(PORT, "0.0.0.0", () => {
             console.log(`Chatbot UPEA TV activo en el puerto ${PORT}`);
         });
     })
     .catch(error => {
-        console.error("No se pudo preparar la base de datos:", error.message);
-        process.exit(1);
-    });
+    console.error("No se pudo preparar la base de datos:");
+    console.error(error);
+    console.error(error.stack);
+    process.exit(1);
+});

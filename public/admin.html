@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>Administración | UPEA TV</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <div id="loginView" class="login-shell">
+    <div class="login-card">
+      <div class="brand-mark">TV</div>
+      <p class="eyebrow">UPEA TELEVISIÓN</p>
+      <h1>Panel administrativo</h1>
+      <p class="muted">Ingresa con tu cuenta de administrador para gestionar el chatbot.</p>
+      <form id="loginForm">
+        <label>Usuario<input id="username" name="usuario" autocomplete="username" required placeholder="Usuario administrador"></label>
+        <label>Contraseña<input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Tu contraseña"></label>
+        <button class="primary full" type="submit">Iniciar sesión <span>→</span></button>
+        <p id="loginError" class="error" role="alert"></p>
+      </form>
+      <p class="login-foot">Acceso restringido · UPEA TV</p>
+    </div>
+  </div>
+
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="side-brand"><div class="brand-mark small">TV</div><div><strong>UPEA TV</strong><small>Administración</small></div></div>
+      <div class="side-label">GESTIÓN DEL CHATBOT</div>
+      <nav id="navigation">
+        <button class="nav-item active" data-page="dashboard"><span>▦</span> Inicio</button>
+        <button class="nav-item" data-page="programa"><span>▣</span> Programas</button>
+        <button class="nav-item" data-page="menu"><span>☷</span> Menús y mensajes</button>
+        <button class="nav-item" data-page="noticia"><span>▤</span> Noticias y portadas</button>
+        <button class="nav-item" data-page="faq"><span>?</span> Preguntas frecuentes</button>
+        <button class="nav-item" data-page="contacto"><span>◎</span> Contactos y redes</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="status-dot"></div><span>Base de datos conectada</span></div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar"><div><span class="eyebrow">ESPACIO DE TRABAJO</span><h2 id="topTitle">Resumen general</h2></div><div class="top-actions"><span class="admin-chip"><span class="avatar">A</span> Administrador</span><button id="logoutBtn" class="outline">Cerrar sesión</button></div></header>
+      <section id="dashboardPage" class="page">
+        <div class="welcome"><div><p class="eyebrow light">PANEL DE CONTROL</p><h1>¡Bienvenido a UPEA TV!</h1><p>Administra la información que reciben los usuarios de tu chatbot de WhatsApp.</p></div><div class="welcome-icon">✦</div></div>
+        <div class="section-heading"><div><h3>Resumen del contenido</h3><p>Información registrada actualmente en tu chatbot.</p></div></div>
+        <div class="stats-grid">
+          <article class="stat-card"><div class="stat-icon purple">▣</div><span>Programas</span><strong id="statProgramas">—</strong><small>Programas registrados</small></article>
+          <article class="stat-card"><div class="stat-icon blue">▤</div><span>Noticias y portadas</span><strong id="statNoticias">—</strong><small>Publicaciones registradas</small></article>
+          <article class="stat-card"><div class="stat-icon orange">?</div><span>Preguntas frecuentes</span><strong id="statFaq">—</strong><small>Respuestas configuradas</small></article>
+          <article class="stat-card"><div class="stat-icon green">✉</div><span>Consultas pendientes</span><strong id="statConsultas">—</strong><small>Solicitudes por atender</small></article>
+        </div>
+        <div class="section-heading"><div><h3>Accesos rápidos</h3><p>Selecciona qué contenido deseas actualizar.</p></div></div>
+        <div class="quick-grid">
+          <button class="quick-card" data-go="programa"><span>▣</span><b>Editar programas</b><small>Horarios, descripción y grabaciones</small><i>→</i></button>
+          <button class="quick-card" data-go="menu"><span>☷</span><b>Editar menús</b><small>Mensajes y textos principales</small><i>→</i></button>
+          <button class="quick-card" data-go="noticia"><span>▤</span><b>Actualizar noticias</b><small>Enlaces de portadas</small><i>→</i></button>
+          <button class="quick-card" data-go="contacto"><span>◎</span><b>Editar contactos</b><small>Redes sociales y ubicación</small><i>→</i></button>
+        </div>
+        <div class="notice"><span>ⓘ</span><p><b>Importante:</b> Los cambios se guardan en Neon PostgreSQL y se reflejan en el contenido que utiliza el chatbot. No necesitas modificar el código para editar estos datos.</p></div>
+      </section>
+
+      <section id="contentPage" class="page hidden">
+        <div class="content-toolbar"><div><p class="eyebrow" id="contentEyebrow">ADMINISTRACIÓN</p><h1 id="contentTitle">Programas</h1><p id="contentDescription" class="muted">Administra el contenido.</p></div><button id="addBtn" class="primary">＋ Nuevo registro</button></div>
+        <div id="contentNotice" class="notice hidden"></div>
+        <div id="records" class="records-grid"></div>
+        <div id="emptyState" class="empty-state hidden"><div>▤</div><h3>No hay registros todavía</h3><p>Agrega el primer registro con el botón superior.</p></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="editorModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+    <div class="modal-backdrop" data-close="true"></div>
+    <div class="modal-card"><div class="modal-head"><div><p class="eyebrow">EDICIÓN DE CONTENIDO</p><h2 id="editorTitle">Nuevo registro</h2></div><button class="icon-button" id="closeModal" aria-label="Cerrar">×</button></div>
+      <form id="editorForm"><div id="editorFields" class="form-grid"></div><div class="modal-actions"><button type="button" id="cancelEdit" class="outline">Cancelar</button><button type="submit" class="primary" id="saveBtn">Guardar cambios</button></div><p id="editorError" class="error"></p></form>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="admin.js" defer></script>
+</body>
+</html>
