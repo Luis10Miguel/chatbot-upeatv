@@ -23,6 +23,9 @@ const YOUTUBE = "https://www.youtube.com/@UPEATELEVISI%C3%93NOFICIAL";
 const WEB = "https://tv.upea.bo/";
 const CORREO = "upeatelevisioncanal25@gmail.com";
 const MAPS = "https://maps.app.goo.gl/LfoYfLBZW5JiC6Vm8";
+const NUMERO_OPERADOR = "59162442321";
+
+const LINK_OPERADOR = `https://wa.me/${NUMERO_OPERADOR}?text=${encodeURIComponent("Hola, necesito comunicarme con UPEA TV.")}`;
 
 const programas = [
     {
@@ -235,7 +238,8 @@ Selecciona una opción:
 1. ❓ Preguntas frecuentes
 2. 📝 Dejar una consulta para el equipo de UPEA TV
 3. 🌐 Ver nuestras redes sociales y contactos
-4. Volver al menú principal`;
+4. 📞 Hablar por llamada con un operador
+5. ↩️ Volver al menú principal`;
 }
 
 function preguntasFrecuentes() {
@@ -562,6 +566,7 @@ async function enviarListaProgramasWhatsApp(numero, tipo) {
 
 async function enviarMenuAdministradorWhatsApp(numero) {
     const version = process.env.GRAPH_API_VERSION || "v26.0";
+
     const endpoint =
         `https://graph.facebook.com/${version}/${process.env.PHONE_NUMBER_ID}/messages`;
 
@@ -600,10 +605,15 @@ async function enviarMenuAdministradorWhatsApp(numero) {
                                 {
                                     id: "admin_3",
                                     title: "🌐 Redes y contactos",
-                                    description: "Consulta nuestras redes y contactos."
+                                    description: "Consulta nuestras redes sociales."
                                 },
                                 {
                                     id: "admin_4",
+                                    title: "📞 Hablar por llamada",
+                                    description: "Contacta directamente al operador."
+                                },
+                                {
+                                    id: "admin_5",
                                     title: "↩️ Volver al menú",
                                     description: "Regresar al menú principal."
                                 }
@@ -763,28 +773,48 @@ async function obtenerRespuesta(numero, texto) {
     }
 
     if (estado === "administrador") {
-        if (normalizado === "1") {
-            await guardarSesion(numero, "faq", {});
-            return preguntasFrecuentes();
-        }
 
-        if (normalizado === "2") {
-            await guardarSesion(numero, "consulta_nombre", {});
-            return `📝 *DEJAR UNA CONSULTA*\n\nPor favor, escribe tu nombre.`;
-        }
-
-        if (normalizado === "3") {
-            await guardarSesion(numero, "redes", {});
-            return menuRedes();
-        }
-
-        if (normalizado === "4") {
-            await guardarSesion(numero, "inicio", {});
-            return menuPrincipal();
-        }
-
-        return menuAdministrador();
+    if (normalizado === "1") {
+        await guardarSesion(numero, "faq", {});
+        return preguntasFrecuentes();
     }
+
+    if (normalizado === "2") {
+        await guardarSesion(numero, "consulta_nombre", {});
+        return `📝 *DEJAR UNA CONSULTA*\n\nPor favor, escribe tu nombre.`;
+    }
+
+    if (normalizado === "3") {
+        await guardarSesion(numero, "redes", {});
+        return menuRedes();
+    }
+
+    if (normalizado === "4") {
+        await guardarSesion(numero, "administrador", {});
+
+        return `📞 *CONTACTAR CON EL OPERADOR DE UPEA TV*
+
+Puedes comunicarte directamente con nuestro operador mediante WhatsApp.
+
+📱 Número: +591 62442321
+
+🔗 Abre este enlace para iniciar el chat:
+${LINK_OPERADOR}
+
+Cuando se abra WhatsApp, pulsa el icono de llamada para realizar la llamada de voz.
+
+*Importante:* la llamada la iniciarás tú desde tu WhatsApp. El chatbot no transfiere automáticamente una llamada entrante.
+
+Escribe MENU para volver al menú principal.`;
+    }
+
+    if (normalizado === "5") {
+        await guardarSesion(numero, "inicio", {});
+        return menuPrincipal();
+    }
+
+    return menuAdministrador();
+}
 
     if (estado === "faq") {
         await guardarSesion(numero, "administrador", {});
@@ -894,7 +924,7 @@ async function procesarWebhook(body) {
     await guardarSesion(numero, "programas", {});
     texto = coincidencia[1];
 
-} else if ((coincidencia = id.match(/^admin_([1-4])$/))) {
+} else if ((coincidencia = id.match(/^admin_([1-5])$/))) {
     await guardarSesion(numero, "administrador", {});
     texto = coincidencia[1];
 
