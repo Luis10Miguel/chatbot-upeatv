@@ -1,6 +1,7 @@
 
 require("dotenv").config();
-
+const fs = require("fs");
+const multer = require("multer");
 const express = require("express");
 const crypto = require("crypto");
 const { Pool } = require("pg");
@@ -25,6 +26,12 @@ const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
 const ADMIN_CATEGORIES = ["programa", "menu", "noticia", "faq", "contacto"];
 const loginAttempts = new Map();
 let contenidoCache = { menu: {}, noticias: [], faqs: [], contacto: {}, config: {} };
+let configuracionCache = {
+    nombre_bot: "Asistente Virtual UPEA TV",
+    mensaje_bienvenida: "¡Hola! 👋 Bienvenido al asistente virtual de UPEA TV 📺",
+    mensaje_despedida: "¡Gracias por comunicarte con UPEA TV! 📺 ¡Hasta pronto!",
+    mensaje_sin_respuesta: "No pude reconocer tu opción. Por favor, intenta nuevamente."
+};
 
 function firmarSesion(payload) {
     const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -51,7 +58,134 @@ function exigirAdministrador(req, res, next) {
     if (!validarSesion(token)) return res.status(401).json({ error: "Sesión no válida. Inicia sesión nuevamente." });
     next();
 }
+// ==========================================
+// SUBIDA Y ADMINISTRACIÓN DE IMÁGENES
+// ==========================================
 
+const directorioImagenes = path.join(__dirname, "media", "uploads");
+
+fs.mkdirSync(directorioImagenes, { recursive: true });
+
+const almacenamientoImagenes = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, directorioImagenes);
+    },
+
+    filename: (req, file, cb) => {
+        const extension = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp"
+        }[file.mimetype];
+
+        if (!extension) {
+            return cb(new Error("Formato de imagen no permitido."));
+        }
+
+        cb(null, `${crypto.randomUUID()}${extension}`);
+    }
+});
+
+const subirImagen = multer({
+    storage: almacenamientoImagenes,
+    limits: {
+        fileSize: 8 * 1024 * 1024
+    },
+    fileFilter: (req, file, cb) => {
+        const permitidos = [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+        ];
+
+        if (!permitidos.includes(file.mimetype)) {
+            return cb(new Error("Solo se permiten imágenes JPG, PNG o WEBP."));
+        }
+
+        cb(null, true);
+    }
+});
+
+// Subir imagen
+app.post(
+    "/api/admin/upload",
+    exigirAdministrador,
+    (req, res, next) => {
+        subirImagen.single("imagen")(req, res, error => {
+            if (error) {
+                return res.status(400).json({
+                    error: error.message || "No se pudo subir la imagen."
+                });
+            }
+            next();
+        });
+    },
+    (req, res) => {
+        if (!req.file) {
+            return res.status(400).json({
+                error: "Selecciona una imagen."
+            });
+        }
+
+        res.status(201).json({
+            ok: true,
+            nombre: req.file.filename,
+            url: `/media/uploads/${req.file.filename}`
+        });
+    }
+);
+
+// Listar imágenes
+app.get("/api/admin/imagenes", exigirAdministrador, (req, res) => {
+    try {
+        const archivos = fs.readdirSync(directorioImagenes);
+
+        const imagenes = archivos
+            .filter(nombre => /\.(jpg|jpeg|png|webp)$/i.test(nombre))
+            .map(nombre => ({
+                nombre,
+                url: `/media/uploads/${nombre}`
+            }));
+
+        res.json(imagenes.reverse());
+
+    } catch (error) {
+        console.error("Error listando imágenes:", error);
+        res.status(500).json({
+            error: "No se pudieron consultar las imágenes."
+        });
+    }
+});
+
+// Eliminar imagen
+app.delete(
+    "/api/admin/imagenes/:nombre",
+    exigirAdministrador,
+    (req, res) => {
+        const nombre = path.basename(req.params.nombre);
+
+        if (nombre !== req.params.nombre) {
+            return res.status(400).json({
+                error: "Nombre de archivo no válido."
+            });
+        }
+
+        const archivo = path.join(directorioImagenes, nombre);
+
+        if (!fs.existsSync(archivo)) {
+            return res.status(404).json({
+                error: "La imagen no existe."
+            });
+        }
+
+        fs.unlinkSync(archivo);
+
+        res.json({
+            ok: true,
+            mensaje: "Imagen eliminada."
+        });
+    }
+);
 function leerContenido(contenido) {
     try { return JSON.parse(contenido); } catch { return contenido; }
 }
@@ -458,10 +592,52 @@ async function prepararBaseDatos() {
             actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     `);
+            await pool.query(`
+        CREATE TABLE IF NOT EXISTS configuracion_bot (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            nombre_bot VARCHAR(80) NOT NULL,
+            mensaje_bienvenida TEXT NOT NULL,
+            mensaje_despedida TEXT NOT NULL,
+            mensaje_sin_respuesta TEXT NOT NULL,
+            actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
 
+    await pool.query(`
+        INSERT INTO configuracion_bot (
+            id,
+            nombre_bot,
+            mensaje_bienvenida,
+            mensaje_despedida,
+            mensaje_sin_respuesta
+        )
+        VALUES (
+            1,
+            'Asistente Virtual UPEA TV',
+            '¡Hola! 👋 Bienvenido al asistente virtual de UPEA TV 📺',
+            '¡Gracias por comunicarte con UPEA TV! 📺 ¡Hasta pronto!',
+            'No pude reconocer tu opción. Por favor, intenta nuevamente.'
+        )
+        ON CONFLICT (id) DO NOTHING
+    `);
     console.log("Base de datos preparada.");
 }
+async function cargarConfiguracionBot() {
+    const resultado = await pool.query(
+        `SELECT nombre_bot,
+                mensaje_bienvenida,
+                mensaje_despedida,
+                mensaje_sin_respuesta
+         FROM configuracion_bot
+         WHERE id = 1`
+    );
 
+    if (resultado.rows.length > 0) {
+        configuracionCache = resultado.rows[0];
+    }
+
+    return configuracionCache;
+}
 async function obtenerSesion(numero) {
     const r = await pool.query(
         `SELECT estado, datos
@@ -546,8 +722,7 @@ async function enviarMenuPrincipalWhatsApp(numero) {
             interactive: {
                 type: "list",
                 body: {
-                    text: contenidoCache.menu?.principal || "¡Hola! 👋 Bienvenido al asistente virtual de UPEA TV 📺\n\n¿En qué podemos ayudarte? Selecciona una opción del menú."
-                },
+text: `${configuracionCache.nombre_bot}\n\n${configuracionCache.mensaje_bienvenida}`                },
                 action: {
                     button: "Abrir menú",
                     sections: [
@@ -773,11 +948,15 @@ async function guardarConsulta(numero, datos) {
 async function obtenerRespuesta(numero, texto) {
     const mensaje = texto.trim();
     const normalizado = mensaje.toLowerCase()
+        
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
-
+if (["adios", "hasta luego", "hasta pronto"].includes(normalizado)) {
+        await guardarSesion(numero, "inicio", {});
+        return configuracionCache.mensaje_despedida;
+    }
     if (["menu", "inicio", "hola", "buenas", "hi", "hello",
-         "buenos dias", "buenas tardes", "buenas noches"].includes(normalizado)) {
+        "buenos dias", "buenas tardes", "buenas noches"].includes(normalizado)) {
         await guardarSesion(numero, "inicio", {});
         return menuPrincipal();
     }
@@ -857,34 +1036,43 @@ async function obtenerRespuesta(numero, texto) {
         return `${menuNoticias()}\n\nEscribe 0 para volver al menú principal.`;
     }
 
-    if (estado === "administrador") {
-        if (normalizado === "1") {
-            await guardarSesion(numero, "faq", {});
-            return preguntasFrecuentes();
-        }
+if (estado === "administrador") {
+    if (normalizado === "1") {
+        await guardarSesion(numero, "faq", {});
+        return preguntasFrecuentes();
+    }
 
-        if (normalizado === "2") {
-            await guardarSesion(numero, "consulta_nombre", {});
-            return `📝 *DEJAR UNA CONSULTA*\n\nPor favor, escribe tu nombre.`;
-        }
+    if (normalizado === "2") {
+        await guardarSesion(numero, "consulta_nombre", {});
+        return `📝 *DEJAR UNA CONSULTA*\n\nPor favor, escribe tu nombre.`;
+    }
 
-        if (normalizado === "3") {
-            await guardarSesion(numero, "redes", {});
-            return menuRedes();
-        }
+    if (normalizado === "3") {
+        await guardarSesion(numero, "redes", {});
+        return menuRedes();
+    }
 
-        if (normalizado === "4") {
-            await guardarSesion(numero, "inicio", {});
-            return menuPrincipal();
-        }
-
+    if (normalizado === "4") {
+    await guardarSesion(numero, "inicio", {});
+    return menuPrincipal();
+}
         return menuAdministrador();
     }
 
-    if (estado === "faq") {
+    
+if (estado === "faq") {
+    const totalFaqs = contenidoCache.faqs?.length || 5;
+    const opcionVolver = totalFaqs + 1;
+
+    if (normalizado === String(opcionVolver)) {
         await guardarSesion(numero, "administrador", {});
-        return `${preguntasFrecuentes()}\n\nEscribe un número para volver a consultar o 6 para volver al menú de administrador.`;
+        return menuAdministrador();
     }
+
+    return `${preguntasFrecuentes()}
+
+Escribe ${opcionVolver} para volver al menú de administrador.`;
+}
 
     if (estado === "redes") {
         await guardarSesion(numero, "administrador", {});
@@ -936,9 +1124,10 @@ La atención no es inmediata ni está disponible las 24 horas.
 Escribe MENU para volver al menú principal.`;
     }
 
-    await guardarSesion(numero, "inicio", {});
+        await guardarSesion(numero, "inicio", {});
     return contenidoCache.config?.mensaje_sin_respuesta || "No pude identificar tu opción. Escribe MENU para ver las opciones disponibles.";
 }
+
 
 // ---------------- PANEL ADMINISTRATIVO UPEA TV ----------------
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
@@ -990,7 +1179,78 @@ app.get("/api/admin/dashboard", exigirAdministrador, async (req, res) => {
         res.json({ programas: counts.programa || 0, noticias: counts.noticia || 0, preguntas: counts.faq || 0, consultasPendientes: q.rows[0].total || 0 });
     } catch (e) { res.status(500).json({ error: "No se pudo cargar el resumen." }); }
 });
+// Obtener configuración general del chatbot
+app.get("/api/admin/configuracion", exigirAdministrador, async (req, res) => {
+    try {
+        const configuracion = await cargarConfiguracionBot();
+        res.json(configuracion);
+    } catch (error) {
+        console.error("Error obteniendo configuración:", error.message);
+        res.status(500).json({
+            error: "No se pudo obtener la configuración."
+        });
+    }
+});
 
+// Guardar configuración general del chatbot
+app.put("/api/admin/configuracion", exigirAdministrador, async (req, res) => {
+    try {
+        const {
+            nombre_bot,
+            mensaje_bienvenida,
+            mensaje_despedida,
+            mensaje_sin_respuesta
+        } = req.body || {};
+
+        if (
+            !String(nombre_bot || "").trim() ||
+            !String(mensaje_bienvenida || "").trim() ||
+            !String(mensaje_despedida || "").trim() ||
+            !String(mensaje_sin_respuesta || "").trim()
+        ) {
+            return res.status(400).json({
+                error: "Todos los campos son obligatorios."
+            });
+        }
+
+        await pool.query(`
+            INSERT INTO configuracion_bot (
+                id,
+                nombre_bot,
+                mensaje_bienvenida,
+                mensaje_despedida,
+                mensaje_sin_respuesta,
+                actualizado_en
+            )
+            VALUES (1, $1, $2, $3, $4, CURRENT_TIMESTAMP)
+            ON CONFLICT (id)
+            DO UPDATE SET
+                nombre_bot = EXCLUDED.nombre_bot,
+                mensaje_bienvenida = EXCLUDED.mensaje_bienvenida,
+                mensaje_despedida = EXCLUDED.mensaje_despedida,
+                mensaje_sin_respuesta = EXCLUDED.mensaje_sin_respuesta,
+                actualizado_en = CURRENT_TIMESTAMP
+        `, [
+            String(nombre_bot).trim(),
+            String(mensaje_bienvenida).trim(),
+            String(mensaje_despedida).trim(),
+            String(mensaje_sin_respuesta).trim()
+        ]);
+
+        await cargarConfiguracionBot();
+
+        res.json({
+            ok: true,
+            mensaje: "Configuración guardada correctamente."
+        });
+
+    } catch (error) {
+        console.error("Error guardando configuración:", error.message);
+        res.status(500).json({
+            error: "No se pudo guardar la configuración."
+        });
+    }
+});
 app.get("/api/admin/config", exigirAdministrador, async (req, res) => {
     try {
         const r = await pool.query("SELECT clave, valor FROM chatbot_config ORDER BY clave");
@@ -1261,6 +1521,7 @@ app.get("/db-test", async (req, res) => {
 
 prepararBaseDatos()
     .then(inicializarContenidoBot)
+    .then(cargarConfiguracionBot)
     .then(() => {
         app.listen(PORT, "0.0.0.0", () => {
             console.log(`Chatbot UPEA TV activo en el puerto ${PORT}`);
