@@ -35,6 +35,7 @@
         <button class="nav-item" data-page="noticia"><span>▤</span> Noticias y portadas</button>
         <button class="nav-item" data-page="faq"><span>?</span> Preguntas frecuentes</button>
         <button class="nav-item" data-page="contacto"><span>◎</span> Contactos y redes</button>
+        <button class="nav-item" data-page="config"><span>⚙</span> Configuración</button>
       </nav>
       <div class="sidebar-bottom"><div class="status-dot"></div><span>Base de datos conectada</span></div>
     </aside>
@@ -58,6 +59,22 @@
           <button class="quick-card" data-go="contacto"><span>◎</span><b>Editar contactos</b><small>Redes sociales y ubicación</small><i>→</i></button>
         </div>
         <div class="notice"><span>ⓘ</span><p><b>Importante:</b> Los cambios se guardan en Neon PostgreSQL y se reflejan en el contenido que utiliza el chatbot. No necesitas modificar el código para editar estos datos.</p></div>
+      </section>
+
+      <section id="configPage" class="page hidden">
+        <div class="content-toolbar"><div><p class="eyebrow">AJUSTES GENERALES</p><h1>Configuración del chatbot</h1><p class="muted">Personaliza los mensajes generales que utiliza el asistente.</p></div></div>
+        <div class="modal-card config-card">
+          <form id="configForm">
+            <div class="form-grid">
+              <div class="field wide"><label for="configNombre">Nombre del chatbot</label><input id="configNombre" name="nombre_bot" maxlength="80" required></div>
+              <div class="field wide"><label for="configBienvenida">Mensaje de bienvenida</label><textarea id="configBienvenida" name="mensaje_bienvenida" maxlength="2000" required></textarea><small>Se utiliza en el encabezado del menú principal cuando no existe un texto personalizado para ese menú.</small></div>
+              <div class="field wide"><label for="configDespedida">Mensaje de despedida</label><textarea id="configDespedida" name="mensaje_despedida" maxlength="2000" required></textarea><small>Queda guardado como configuración; en esta primera entrega todavía no se dispara automáticamente.</small></div>
+              <div class="field wide"><label for="configFallback">Mensaje para opciones no reconocidas</label><textarea id="configFallback" name="mensaje_sin_respuesta" maxlength="2000" required></textarea><small>Texto preparado para conectarlo al flujo de respuestas en la siguiente etapa.</small></div>
+            </div>
+            <div class="modal-actions"><button class="primary" type="submit" id="saveConfigBtn">Guardar configuración</button></div>
+            <p id="configError" class="error" role="alert"></p>
+          </form>
+        </div>
       </section>
 
       <section id="contentPage" class="page hidden">

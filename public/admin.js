@@ -52,10 +52,33 @@ async function loadDashboard() {
 function showPage(page) {
   state.page = page;
   $("#dashboardPage").classList.toggle("hidden", page !== "dashboard");
-  $("#contentPage").classList.toggle("hidden", page === "dashboard");
-  document.querySelectorAll(".nav-item").forEach(btn => btn.classList.toggle("active", btn.dataset.page === page));
-  $("#topTitle").textContent = page === "dashboard" ? "Resumen general" : pages[page].title;
-  if (page !== "dashboard") loadCategory(page);
+  $("#contentPage").classList.toggle("hidden", page === "dashboard" || page === "config");
+  $("#configPage").classList.toggle("hidden", page !== "config");
+  async function loadConfig() {
+  $("#configError").textContent = "";
+  try {
+    const data = await api("/api/admin/config");
+    $("#configNombre").value = data.nombre_bot || "";
+    $("#configBienvenida").value = data.mensaje_bienvenida || "";
+    $("#configDespedida").value = data.mensaje_despedida || "";
+    $("#configFallback").value = data.mensaje_sin_respuesta || "";
+  } catch (error) { $("#configError").textContent = error.message; }
+}
+$("#configForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = $("#saveConfigBtn"); button.disabled = true; button.textContent = "Guardando...";
+  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+  try {
+    await api("/api/admin/config", { method: "PUT", body: JSON.stringify(payload) });
+    notify("Configuración guardada correctamente.");
+  } catch (error) { $("#configError").textContent = error.message; }
+  finally { button.disabled = false; button.textContent = "Guardar configuración"; }
+});
+
+document.querySelectorAll(".nav-item").forEach(btn => btn.classList.toggle("active", btn.dataset.page === page));
+  $("#topTitle").textContent = page === "dashboard" ? "Resumen general" : page === "config" ? "Configuración" : pages[page].title;
+  if (page === "config") loadConfig();
+  else if (page !== "dashboard") loadCategory(page);
 }
 async function loadCategory(category) {
   state.category = category;
@@ -167,6 +190,27 @@ async function loadDashboardStatsOnly() {
   $("#statProgramas").textContent = data.programas; $("#statNoticias").textContent = data.noticias;
   $("#statFaq").textContent = data.preguntas; $("#statConsultas").textContent = data.consultasPendientes;
 }
+
+async function loadConfig() {
+  $("#configError").textContent = "";
+  try {
+    const data = await api("/api/admin/config");
+    $("#configNombre").value = data.nombre_bot || "";
+    $("#configBienvenida").value = data.mensaje_bienvenida || "";
+    $("#configDespedida").value = data.mensaje_despedida || "";
+    $("#configFallback").value = data.mensaje_sin_respuesta || "";
+  } catch (error) { $("#configError").textContent = error.message; }
+}
+$("#configForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = $("#saveConfigBtn"); button.disabled = true; button.textContent = "Guardando...";
+  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+  try {
+    await api("/api/admin/config", { method: "PUT", body: JSON.stringify(payload) });
+    notify("Configuración guardada correctamente.");
+  } catch (error) { $("#configError").textContent = error.message; }
+  finally { button.disabled = false; button.textContent = "Guardar configuración"; }
+});
 
 document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => showPage(btn.dataset.page)));
 document.querySelectorAll("[data-go]").forEach(btn => btn.addEventListener("click", () => showPage(btn.dataset.go)));

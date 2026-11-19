@@ -24,7 +24,7 @@ const ADMIN_COOKIE = "upea_admin_session";
 const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
 const ADMIN_CATEGORIES = ["programa", "menu", "noticia", "faq", "contacto"];
 const loginAttempts = new Map();
-let contenidoCache = { menu: {}, noticias: [], faqs: [], contacto: {} };
+let contenidoCache = { menu: {}, noticias: [], faqs: [], contacto: {}, config: {} };
 
 function firmarSesion(payload) {
     const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -76,6 +76,9 @@ async function cargarContenidoBot() {
     contenidoCache.faqs = porCategoria("faq").map(x => ({ id: x.id, pregunta: x.titulo, respuesta: x.contenido }));
     contenidoCache.contacto = {};
     for (const x of porCategoria("contacto")) contenidoCache.contacto[x.titulo] = x.contenido;
+
+    const config = await pool.query("SELECT clave, valor FROM chatbot_config");
+    contenidoCache.config = Object.fromEntries(config.rows.map(x => [x.clave, x.valor]));
 }
 
 async function inicializarContenidoBot() {
@@ -209,11 +212,19 @@ const periodicos = Array.from({ length: 16 }, (_, i) => ({
 }));
 
 function menuPrincipal() {
-    if (contenidoCache.menu?.principal) return contenidoCache.menu.principal;
-    return `📺 *ASISTENTE VIRTUAL DE UPEA TV*
+    if (contenidoCache.menu?.principal) {
+        let guardado = contenidoCache.menu.principal;
+        const nombre = contenidoCache.config?.nombre_bot;
+        if (nombre) guardado = guardado.replace("*ASISTENTE VIRTUAL DE UPEA TV*", `*ASISTENTE VIRTUAL DE ${nombre.toUpperCase()}*`);
+        const bienvenidaDefault = "¡Hola! 👋\nBienvenido al asistente virtual de UPEA TV 📺";
+        const bienvenidaConfig = contenidoCache.config?.mensaje_bienvenida;
+        return bienvenidaConfig ? guardado.replace(bienvenidaDefault, bienvenidaConfig) : guardado;
+    }
+    const nombre = contenidoCache.config?.nombre_bot || "UPEA TV";
+    const bienvenida = contenidoCache.config?.mensaje_bienvenida || "¡Hola! 👋\nBienvenido al asistente virtual de UPEA TV 📺";
+    return `📺 *ASISTENTE VIRTUAL DE ${nombre.toUpperCase()}*
 
-¡Hola! 👋
-Bienvenido al asistente virtual de UPEA TV 📺
+${bienvenida}
 
 ¿En qué podemos ayudarte?
 
@@ -425,6 +436,14 @@ async function prepararBaseDatos() {
             mensaje TEXT,
             estado VARCHAR(30) NOT NULL DEFAULT 'pendiente',
             creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS chatbot_config (
+            clave VARCHAR(80) PRIMARY KEY,
+            valor TEXT NOT NULL DEFAULT '',
+            actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
@@ -907,7 +926,8 @@ async function obtenerRespuesta(numero, texto) {
         await guardarConsulta(numero, consulta);
         await guardarSesion(numero, "inicio", {});
 
-        return `¡Gracias por comunicarte con UPEA TV! 📺
+        const despedida = contenidoCache.config?.mensaje_despedida || "¡Gracias por comunicarte con UPEA TV! 📺";
+        return `${despedida}
 
 Tu consulta ha sido registrada para que el equipo pueda revisarla y responderte cuando esté disponible.
 
@@ -917,7 +937,7 @@ Escribe MENU para volver al menú principal.`;
     }
 
     await guardarSesion(numero, "inicio", {});
-    return menuPrincipal();
+    return contenidoCache.config?.mensaje_sin_respuesta || "No pude identificar tu opción. Escribe MENU para ver las opciones disponibles.";
 }
 
 // ---------------- PANEL ADMINISTRATIVO UPEA TV ----------------
@@ -969,6 +989,39 @@ app.get("/api/admin/dashboard", exigirAdministrador, async (req, res) => {
         const q = await pool.query("SELECT COUNT(*)::int AS total FROM consultas_bot WHERE estado = 'pendiente'");
         res.json({ programas: counts.programa || 0, noticias: counts.noticia || 0, preguntas: counts.faq || 0, consultasPendientes: q.rows[0].total || 0 });
     } catch (e) { res.status(500).json({ error: "No se pudo cargar el resumen." }); }
+});
+
+app.get("/api/admin/config", exigirAdministrador, async (req, res) => {
+    try {
+        const r = await pool.query("SELECT clave, valor FROM chatbot_config ORDER BY clave");
+        const config = Object.fromEntries(r.rows.map(x => [x.clave, x.valor]));
+        res.json({
+            nombre_bot: config.nombre_bot || "UPEA TV",
+            mensaje_bienvenida: config.mensaje_bienvenida || "¡Hola! 👋\nBienvenido al asistente virtual de UPEA TV 📺",
+            mensaje_despedida: config.mensaje_despedida || "Gracias por comunicarte con UPEA TV. ¡Hasta pronto! 📺",
+            mensaje_sin_respuesta: config.mensaje_sin_respuesta || "No pude identificar tu opción. Escribe MENU para ver las opciones disponibles."
+        });
+    } catch (e) { res.status(500).json({ error: "No se pudo cargar la configuración." }); }
+});
+
+app.put("/api/admin/config", exigirAdministrador, async (req, res) => {
+    const permitidas = ["nombre_bot", "mensaje_bienvenida", "mensaje_despedida", "mensaje_sin_respuesta"];
+    const valores = req.body || {};
+    for (const clave of permitidas) {
+        if (typeof valores[clave] !== "string" || !valores[clave].trim()) {
+            return res.status(400).json({ error: `El campo ${clave} es obligatorio.` });
+        }
+        if (valores[clave].length > (clave === "nombre_bot" ? 80 : 2000)) {
+            return res.status(400).json({ error: `El campo ${clave} supera la longitud permitida.` });
+        }
+    }
+    try {
+        for (const clave of permitidas) {
+            await pool.query(`INSERT INTO chatbot_config (clave, valor, actualizado_en) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, actualizado_en = CURRENT_TIMESTAMP`, [clave, valores[clave].trim()]);
+        }
+        await cargarContenidoBot();
+        res.json({ ok: true, mensaje: "Configuración actualizada." });
+    } catch (e) { res.status(500).json({ error: "No se pudo guardar la configuración." }); }
 });
 
 app.get("/api/admin/content", exigirAdministrador, async (req, res) => {
