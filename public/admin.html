@@ -33,8 +33,12 @@
         <button class="nav-item" data-page="programa"><span>▣</span> Programas</button>
         <button class="nav-item" data-page="menu"><span>☷</span> Menús y mensajes</button>
         <button class="nav-item" data-page="noticia"><span>▤</span> Noticias y portadas</button>
+        <button class="nav-item" data-page="imagenes">
+  <span>▧</span> Imágenes
+</button>
         <button class="nav-item" data-page="faq"><span>?</span> Preguntas frecuentes</button>
         <button class="nav-item" data-page="contacto"><span>◎</span> Contactos y redes</button>
+        <button class="nav-item" data-page="config"><span>⚙</span> Configuración</button>
         <button class="nav-item" data-page="config"><span>⚙</span> Configuración</button>
       </nav>
       <div class="sidebar-bottom"><div class="status-dot"></div><span>Base de datos conectada</span></div>
@@ -43,6 +47,71 @@
     <main class="main-area">
       <header class="topbar"><div><span class="eyebrow">ESPACIO DE TRABAJO</span><h2 id="topTitle">Resumen general</h2></div><div class="top-actions"><span class="admin-chip"><span class="avatar">A</span> Administrador</span><button id="logoutBtn" class="outline">Cerrar sesión</button></div></header>
       <section id="dashboardPage" class="page">
+        <section id="configPage" class="page hidden">
+  <div class="content-toolbar">
+    <div>
+      <p class="eyebrow">AJUSTES GENERALES</p>
+      <h1>Configuración del chatbot</h1>
+      <p class="muted">Personaliza los mensajes generales del asistente.</p>
+    </div>
+  </div>
+
+  <div class="modal-card">
+    <form id="configForm">
+      <div class="form-grid">
+
+        <div class="field wide">
+          <label for="configNombre">Nombre del chatbot</label>
+          <input
+            id="configNombre"
+            name="nombre_bot"
+            maxlength="80"
+            required
+          >
+        </div>
+
+        <div class="field wide">
+          <label for="configBienvenida">Mensaje de bienvenida</label>
+          <textarea
+            id="configBienvenida"
+            name="mensaje_bienvenida"
+            maxlength="2000"
+            required
+          ></textarea>
+        </div>
+
+        <div class="field wide">
+          <label for="configDespedida">Mensaje de despedida</label>
+          <textarea
+            id="configDespedida"
+            name="mensaje_despedida"
+            maxlength="2000"
+            required
+          ></textarea>
+        </div>
+
+        <div class="field wide">
+          <label for="configFallback">Mensaje para opciones no reconocidas</label>
+          <textarea
+            id="configFallback"
+            name="mensaje_sin_respuesta"
+            maxlength="2000"
+            required
+          ></textarea>
+        </div>
+
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="primary" id="saveConfigBtn">
+          Guardar configuración
+        </button>
+      </div>
+
+      <p id="configError" class="error" role="alert"></p>
+    </form>
+  </div>
+</section>
         <div class="welcome"><div><p class="eyebrow light">PANEL DE CONTROL</p><h1>¡Bienvenido a UPEA TV!</h1><p>Administra la información que reciben los usuarios de tu chatbot de WhatsApp.</p></div><div class="welcome-icon">✦</div></div>
         <div class="section-heading"><div><h3>Resumen del contenido</h3><p>Información registrada actualmente en tu chatbot.</p></div></div>
         <div class="stats-grid">
@@ -76,13 +145,72 @@
           </form>
         </div>
       </section>
+<section id="imagenesPage" class="page hidden">
 
+  <div class="content-toolbar">
+    <div>
+      <p class="eyebrow">MULTIMEDIA</p>
+      <h1>Biblioteca de imágenes</h1>
+      <p class="muted">
+        Sube, visualiza y administra las imágenes de UPEA TV.
+      </p>
+    </div>
+  </div>
+
+  <div class="upload-card">
+    <h3>Subir nueva imagen</h3>
+
+    <form id="uploadForm">
+      <label for="imagenArchivo" class="upload-area">
+        <span>☁</span>
+        <strong>Selecciona una imagen</strong>
+        <small>JPG, PNG o WEBP · Máximo 8 MB</small>
+      </label>
+
+      <input
+        type="file"
+        id="imagenArchivo"
+        accept="image/jpeg,image/png,image/webp"
+        required
+      >
+
+      <div id="previewImagen" class="preview-imagen"></div>
+
+      <button type="submit" class="primary" id="uploadBtn">
+        Subir imagen
+      </button>
+
+      <p id="uploadError" class="error"></p>
+    </form>
+  </div>
+
+  <div class="section-heading">
+    <div>
+      <h3>Imágenes disponibles</h3>
+      <p>Selecciona una imagen para utilizarla en una portada.</p>
+    </div>
+
+    <button id="refreshImages" class="outline">
+      Actualizar
+    </button>
+  </div>
+
+  <div id="imageGallery" class="image-gallery"></div>
+
+  <div id="emptyImages" class="empty-state hidden">
+    <div>▧</div>
+    <h3>No hay imágenes todavía</h3>
+    <p>Sube tu primera imagen para comenzar.</p>
+  </div>
+
+</section>
       <section id="contentPage" class="page hidden">
         <div class="content-toolbar"><div><p class="eyebrow" id="contentEyebrow">ADMINISTRACIÓN</p><h1 id="contentTitle">Programas</h1><p id="contentDescription" class="muted">Administra el contenido.</p></div><button id="addBtn" class="primary">＋ Nuevo registro</button></div>
         <div id="contentNotice" class="notice hidden"></div>
         <div id="records" class="records-grid"></div>
         <div id="emptyState" class="empty-state hidden"><div>▤</div><h3>No hay registros todavía</h3><p>Agrega el primer registro con el botón superior.</p></div>
       </section>
+      
     </main>
   </div>
 

@@ -1,12 +1,47 @@
 const $ = (selector) => document.querySelector(selector);
 const state = { page: "dashboard", category: null, records: [], editingId: null };
 const pages = {
-  programa: { title: "Programas", description: "Actualiza horarios, descripciones, enlaces y grabaciones de los programas.", hint: "Los cambios se utilizan en Programación e Información de programas." },
-  menu: { title: "Menús y mensajes", description: "Modifica los textos que reciben los usuarios en WhatsApp.", hint: "Edita el texto del menú principal y el mensaje de noticias." },
-  noticia: { title: "Noticias y portadas", description: "Administra las portadas que se comparten en la opción Noticias y novedades.", hint: "Utiliza enlaces públicos HTTPS a las imágenes para que WhatsApp pueda descargarlas." },
-  faq: { title: "Preguntas frecuentes", description: "Agrega y actualiza las respuestas automáticas a las dudas frecuentes.", hint: "Las preguntas se muestran en el menú de atención al usuario." },
-  contacto: { title: "Contactos y redes", description: "Actualiza las redes sociales, el correo y la ubicación de UPEA TV.", hint: "Los enlaces se utilizan en Ubicación y contacto y Redes sociales." }
+  programa: {
+    title: "Programas",
+    description: "Actualiza horarios, descripciones, enlaces y grabaciones de los programas.",
+    hint: "Los cambios se utilizan en Programación e Información de programas."
+  },
+imagenes: {
+    title: "Biblioteca de imágenes",
+    description: "Sube y administra imágenes de UPEA TV.",
+    hint: "Biblioteca multimedia."
+},
+  menu: {
+    title: "Menús y mensajes",
+    description: "Modifica los textos que reciben los usuarios en WhatsApp.",
+    hint: "Edita el texto del menú principal y el mensaje de noticias."
+  },
+
+  noticia: {
+    title: "Noticias y portadas",
+    description: "Administra las portadas que se comparten en la opción Noticias y novedades.",
+    hint: "Utiliza enlaces públicos HTTPS a las imágenes para que WhatsApp pueda descargarlas."
+  },
+
+  faq: {
+    title: "Preguntas frecuentes",
+    description: "Agrega y actualiza las respuestas automáticas a las dudas frecuentes.",
+    hint: "Las preguntas se muestran en el menú de atención al usuario."
+  },
+
+  contacto: {
+    title: "Contactos y redes",
+    description: "Actualiza las redes sociales, el correo y la ubicación de UPEA TV.",
+    hint: "Los enlaces se utilizan en Ubicación y contacto y Redes sociales."
+  },
+
+  config: {
+    title: "Configuración",
+    description: "Personaliza los mensajes generales del chatbot.",
+    hint: "Ajustes generales del asistente virtual."
+  }
 };
+
 
 function notify(message) {
   const toast = $("#toast"); toast.textContent = message; toast.classList.add("show");
@@ -51,34 +86,44 @@ async function loadDashboard() {
 }
 function showPage(page) {
   state.page = page;
-  $("#dashboardPage").classList.toggle("hidden", page !== "dashboard");
-  $("#contentPage").classList.toggle("hidden", page === "dashboard" || page === "config");
-  $("#configPage").classList.toggle("hidden", page !== "config");
-  async function loadConfig() {
-  $("#configError").textContent = "";
-  try {
-    const data = await api("/api/admin/config");
-    $("#configNombre").value = data.nombre_bot || "";
-    $("#configBienvenida").value = data.mensaje_bienvenida || "";
-    $("#configDespedida").value = data.mensaje_despedida || "";
-    $("#configFallback").value = data.mensaje_sin_respuesta || "";
-  } catch (error) { $("#configError").textContent = error.message; }
-}
-$("#configForm").addEventListener("submit", async event => {
-  event.preventDefault();
-  const button = $("#saveConfigBtn"); button.disabled = true; button.textContent = "Guardando...";
-  const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-  try {
-    await api("/api/admin/config", { method: "PUT", body: JSON.stringify(payload) });
-    notify("Configuración guardada correctamente.");
-  } catch (error) { $("#configError").textContent = error.message; }
-  finally { button.disabled = false; button.textContent = "Guardar configuración"; }
-});
+$("#imagenesPage").classList.toggle(
+    "hidden",
+    page !== "imagenes"
+);
+  $("#dashboardPage").classList.toggle(
+    "hidden",
+    page !== "dashboard"
+  );
 
-document.querySelectorAll(".nav-item").forEach(btn => btn.classList.toggle("active", btn.dataset.page === page));
-  $("#topTitle").textContent = page === "dashboard" ? "Resumen general" : page === "config" ? "Configuración" : pages[page].title;
-  if (page === "config") loadConfig();
-  else if (page !== "dashboard") loadCategory(page);
+  $("#contentPage").classList.toggle(
+    "hidden",
+    page === "dashboard" || page === "config"
+  );
+
+  $("#configPage").classList.toggle(
+    "hidden",
+    page !== "config"
+  );
+
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.classList.toggle(
+      "active",
+      btn.dataset.page === page
+    );
+  });
+
+  $("#topTitle").textContent =
+    page === "dashboard"
+      ? "Resumen general"
+      : pages[page].title;
+
+  if (page === "config") {
+    cargarConfiguracion();
+} else if (page === "imagenes") {
+    cargarImagenes();
+} else if (page !== "dashboard") {
+    loadCategory(page);
+}
 }
 async function loadCategory(category) {
   state.category = category;
@@ -214,4 +259,218 @@ $("#configForm").addEventListener("submit", async event => {
 
 document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => showPage(btn.dataset.page)));
 document.querySelectorAll("[data-go]").forEach(btn => btn.addEventListener("click", () => showPage(btn.dataset.go)));
+async function cargarConfiguracion() {
+  try {
+    const config = await api("/api/admin/configuracion");
+
+    $("#configNombre").value = config.nombre_bot || "";
+    $("#configBienvenida").value = config.mensaje_bienvenida || "";
+    $("#configDespedida").value = config.mensaje_despedida || "";
+    $("#configFallback").value = config.mensaje_sin_respuesta || "";
+
+    $("#configError").textContent = "";
+
+  } catch (error) {
+    $("#configError").textContent = error.message;
+  }
+}
+$("#configForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const boton = $("#saveConfigBtn");
+  const error = $("#configError");
+
+  error.textContent = "";
+  boton.disabled = true;
+  boton.textContent = "Guardando...";
+
+  const configuracion = {
+    nombre_bot: $("#configNombre").value.trim(),
+    mensaje_bienvenida: $("#configBienvenida").value.trim(),
+    mensaje_despedida: $("#configDespedida").value.trim(),
+    mensaje_sin_respuesta: $("#configFallback").value.trim()
+  };
+
+  try {
+    await api("/api/admin/configuracion", {
+      method: "PUT",
+      body: JSON.stringify(configuracion)
+    });
+
+    notify("Configuración guardada correctamente.");
+
+  } catch (e) {
+    error.textContent = e.message;
+
+  } finally {
+    boton.disabled = false;
+    boton.textContent = "Guardar configuración";
+  }
+});
+// ==========================================
+// BIBLIOTECA DE IMÁGENES
+// ==========================================
+
+async function cargarImagenes() {
+    const galeria = $("#imageGallery");
+    const vacio = $("#emptyImages");
+
+    galeria.innerHTML = "<p>Cargando imágenes...</p>";
+
+    try {
+        const imagenes = await api("/api/admin/imagenes");
+
+        galeria.innerHTML = "";
+
+        vacio.classList.toggle("hidden", imagenes.length > 0);
+
+        imagenes.forEach(imagen => {
+            const tarjeta = document.createElement("article");
+            tarjeta.className = "image-card";
+
+            const foto = document.createElement("img");
+            foto.src = imagen.url;
+            foto.alt = imagen.nombre;
+
+            const nombre = document.createElement("p");
+            nombre.textContent = imagen.nombre;
+
+            const acciones = document.createElement("div");
+            acciones.className = "image-actions";
+
+            const usar = document.createElement("button");
+            usar.className = "primary";
+            usar.textContent = "Usar en portada";
+
+            usar.addEventListener("click", async () => {
+                showPage("noticia");
+                openEditor();
+
+                const campo = document.querySelector(
+                    '[name="url"]'
+                );
+
+                if (campo) {
+                    campo.value = new URL(
+                        imagen.url,
+                        window.location.origin
+                    ).href;
+                }
+            });
+
+            const eliminar = document.createElement("button");
+            eliminar.className = "mini-btn delete";
+            eliminar.textContent = "Eliminar";
+
+            eliminar.addEventListener("click", async () => {
+                if (!confirm("¿Deseas eliminar esta imagen?")) {
+                    return;
+                }
+
+                try {
+                    await api(
+                        `/api/admin/imagenes/${encodeURIComponent(imagen.nombre)}`,
+                        { method: "DELETE" }
+                    );
+
+                    notify("Imagen eliminada.");
+                    cargarImagenes();
+
+                } catch (error) {
+                    notify(error.message);
+                }
+            });
+
+            acciones.append(usar, eliminar);
+            tarjeta.append(foto, nombre, acciones);
+            galeria.append(tarjeta);
+        });
+
+    } catch (error) {
+        galeria.innerHTML = "";
+        notify(error.message);
+    }
+}
+
+
+// Vista previa
+$("#imagenArchivo").addEventListener("change", event => {
+    const archivo = event.target.files[0];
+    const preview = $("#previewImagen");
+
+    preview.innerHTML = "";
+
+    if (!archivo) return;
+
+    if (archivo.size > 8 * 1024 * 1024) {
+        $("#uploadError").textContent =
+            "La imagen supera el límite de 8 MB.";
+
+        event.target.value = "";
+        return;
+    }
+
+    const imagen = document.createElement("img");
+    imagen.src = URL.createObjectURL(archivo);
+
+    preview.append(imagen);
+    $("#uploadError").textContent = "";
+});
+
+
+// Subir imagen
+$("#uploadForm").addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const archivo = $("#imagenArchivo").files[0];
+    const boton = $("#uploadBtn");
+    const error = $("#uploadError");
+
+    error.textContent = "";
+
+    if (!archivo) {
+        error.textContent = "Selecciona una imagen.";
+        return;
+    }
+
+    const datos = new FormData();
+    datos.append("imagen", archivo);
+
+    boton.disabled = true;
+    boton.textContent = "Subiendo...";
+
+    try {
+        const respuesta = await fetch("/api/admin/upload", {
+            method: "POST",
+            credentials: "same-origin",
+            body: datos
+        });
+
+        const resultado = await respuesta.json();
+
+        if (!respuesta.ok) {
+            throw new Error(
+                resultado.error || "No se pudo subir la imagen."
+            );
+        }
+
+        $("#uploadForm").reset();
+        $("#previewImagen").innerHTML = "";
+
+        notify("Imagen subida correctamente.");
+
+        await cargarImagenes();
+
+    } catch (e) {
+        error.textContent = e.message;
+
+    } finally {
+        boton.disabled = false;
+        boton.textContent = "Subir imagen";
+    }
+});
+
+
+// Actualizar galería
+$("#refreshImages").addEventListener("click", cargarImagenes);
 checkSession();
