@@ -3,224 +3,104 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101827">
-  <title>Administración | UPEA TV</title>
+  <meta name="theme-color" content="#111827">
+  <title>Panel administrativo | UPEA TV</title>
   <link rel="stylesheet" href="admin.css">
+  <script src="admin.js" defer></script>
 </head>
 <body>
-  <div id="loginView" class="login-shell">
-    <div class="login-card">
+  <section id="loginView" class="login-shell">
+    <form id="loginForm" class="login-card">
       <div class="brand-mark">TV</div>
       <p class="eyebrow">UPEA TELEVISIÓN</p>
       <h1>Panel administrativo</h1>
-      <p class="muted">Ingresa con tu cuenta de administrador para gestionar el chatbot.</p>
-      <form id="loginForm">
-        <label>Usuario<input id="username" name="usuario" autocomplete="username" required placeholder="Usuario administrador"></label>
-        <label>Contraseña<input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Tu contraseña"></label>
-        <button class="primary full" type="submit">Iniciar sesión <span>→</span></button>
-        <p id="loginError" class="error" role="alert"></p>
-      </form>
+      <p class="muted">Ingresa con tu cuenta para administrar el chatbot.</p>
+      <label>Usuario<input id="username" name="usuario" autocomplete="username" required placeholder="Usuario administrador"></label>
+      <label>Contraseña<input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Contraseña"></label>
+      <button class="primary full" type="submit" id="loginBtn">Iniciar sesión <span>→</span></button>
+      <p id="loginError" class="error" role="alert"></p>
       <p class="login-foot">Acceso restringido · UPEA TV</p>
-    </div>
-  </div>
+    </form>
+  </section>
 
   <div id="appView" class="app-shell hidden">
     <aside class="sidebar">
       <div class="side-brand"><div class="brand-mark small">TV</div><div><strong>UPEA TV</strong><small>Administración</small></div></div>
-      <div class="side-label">GESTIÓN DEL CHATBOT</div>
+      <p class="side-label">GESTIÓN DEL CHATBOT</p>
       <nav id="navigation">
-        <button class="nav-item active" data-page="dashboard"><span>▦</span> Inicio</button>
-        <button class="nav-item" data-page="programa"><span>▣</span> Programas</button>
-        <button class="nav-item" data-page="menu"><span>☷</span> Menús y mensajes</button>
+        <button class="nav-item active" data-page="dashboard"><span>▦</span> Resumen</button>
+        <button class="nav-item" data-page="programa"><span>▣</span> Programación y programas</button>
+        <button class="nav-item" data-page="menu"><span>☷</span> Menús y submenús</button>
         <button class="nav-item" data-page="noticia"><span>▤</span> Noticias y portadas</button>
-        <button class="nav-item" data-page="imagenes">
-  <span>▧</span> Imágenes
-</button>
+        <button class="nav-item" data-page="contacto"><span>◎</span> Ubicación y contactos</button>
         <button class="nav-item" data-page="faq"><span>?</span> Preguntas frecuentes</button>
-        <button class="nav-item" data-page="contacto"><span>◎</span> Contactos y redes</button>
-        <button class="nav-item" data-page="config"><span>⚙</span> Configuración</button>
+        <button class="nav-item" data-page="consultas"><span>✉</span> Consultas recibidas <span id="pendingBadge" class="nav-count">0</span></button>
+        <button class="nav-item" data-page="imagenes"><span>▧</span> Biblioteca de imágenes</button>
         <button class="nav-item" data-page="config"><span>⚙</span> Configuración</button>
       </nav>
-      <div class="sidebar-bottom"><div class="status-dot"></div><span>Base de datos conectada</span></div>
+      <div class="sidebar-bottom"><i></i><span>Panel conectado</span></div>
     </aside>
 
     <main class="main-area">
-      <header class="topbar"><div><span class="eyebrow">ESPACIO DE TRABAJO</span><h2 id="topTitle">Resumen general</h2></div><div class="top-actions"><span class="admin-chip"><span class="avatar">A</span> Administrador</span><button id="logoutBtn" class="outline">Cerrar sesión</button></div></header>
+      <header class="topbar">
+        <div><p class="eyebrow">ESPACIO DE TRABAJO</p><h2 id="topTitle">Resumen general</h2></div>
+        <div class="top-actions"><span class="admin-chip"><b>A</b> Administrador</span><button id="logoutBtn" class="outline">Cerrar sesión</button></div>
+      </header>
+
       <section id="dashboardPage" class="page">
-        <section id="configPage" class="page hidden">
-  <div class="content-toolbar">
-    <div>
-      <p class="eyebrow">AJUSTES GENERALES</p>
-      <h1>Configuración del chatbot</h1>
-      <p class="muted">Personaliza los mensajes generales del asistente.</p>
-    </div>
-  </div>
-
-  <div class="modal-card">
-    <form id="configForm">
-      <div class="form-grid">
-
-        <div class="field wide">
-          <label for="configNombre">Nombre del chatbot</label>
-          <input
-            id="configNombre"
-            name="nombre_bot"
-            maxlength="80"
-            required
-          >
-        </div>
-
-        <div class="field wide">
-          <label for="configBienvenida">Mensaje de bienvenida</label>
-          <textarea
-            id="configBienvenida"
-            name="mensaje_bienvenida"
-            maxlength="2000"
-            required
-          ></textarea>
-        </div>
-
-        <div class="field wide">
-          <label for="configDespedida">Mensaje de despedida</label>
-          <textarea
-            id="configDespedida"
-            name="mensaje_despedida"
-            maxlength="2000"
-            required
-          ></textarea>
-        </div>
-
-        <div class="field wide">
-          <label for="configFallback">Mensaje para opciones no reconocidas</label>
-          <textarea
-            id="configFallback"
-            name="mensaje_sin_respuesta"
-            maxlength="2000"
-            required
-          ></textarea>
-        </div>
-
-      </div>
-
-      <div class="modal-actions">
-        <button type="submit" class="primary" id="saveConfigBtn">
-          Guardar configuración
-        </button>
-      </div>
-
-      <p id="configError" class="error" role="alert"></p>
-    </form>
-  </div>
-</section>
-        <div class="welcome"><div><p class="eyebrow light">PANEL DE CONTROL</p><h1>¡Bienvenido a UPEA TV!</h1><p>Administra la información que reciben los usuarios de tu chatbot de WhatsApp.</p></div><div class="welcome-icon">✦</div></div>
-        <div class="section-heading"><div><h3>Resumen del contenido</h3><p>Información registrada actualmente en tu chatbot.</p></div></div>
+        <div class="welcome"><div><p class="eyebrow light">PANEL DE CONTROL</p><h1>¡Bienvenido a UPEA TV!</h1><p>Administra los contenidos y las consultas que recibe el chatbot de WhatsApp.</p></div><div class="welcome-icon">✦</div></div>
+        <div class="section-heading"><div><h3>Resumen del contenido</h3><p>Estado actual de la información registrada.</p></div><button id="refreshDashboard" class="outline">Actualizar</button></div>
         <div class="stats-grid">
-          <article class="stat-card"><div class="stat-icon purple">▣</div><span>Programas</span><strong id="statProgramas">—</strong><small>Programas registrados</small></article>
-          <article class="stat-card"><div class="stat-icon blue">▤</div><span>Noticias y portadas</span><strong id="statNoticias">—</strong><small>Publicaciones registradas</small></article>
-          <article class="stat-card"><div class="stat-icon orange">?</div><span>Preguntas frecuentes</span><strong id="statFaq">—</strong><small>Respuestas configuradas</small></article>
-          <article class="stat-card"><div class="stat-icon green">✉</div><span>Consultas pendientes</span><strong id="statConsultas">—</strong><small>Solicitudes por atender</small></article>
+          <article class="stat-card"><span class="stat-icon purple">▣</span><span>Programas</span><strong id="statProgramas">—</strong><small>Programas activos</small></article>
+          <article class="stat-card"><span class="stat-icon blue">▤</span><span>Noticias</span><strong id="statNoticias">—</strong><small>Portadas registradas</small></article>
+          <article class="stat-card"><span class="stat-icon orange">?</span><span>Preguntas frecuentes</span><strong id="statFaq">—</strong><small>Respuestas configuradas</small></article>
+          <article class="stat-card"><span class="stat-icon green">✉</span><span>Consultas pendientes</span><strong id="statConsultas">—</strong><small>Por revisar</small></article>
         </div>
-        <div class="section-heading"><div><h3>Accesos rápidos</h3><p>Selecciona qué contenido deseas actualizar.</p></div></div>
+        <div class="section-heading"><div><h3>Accesos rápidos</h3><p>Selecciona el contenido que deseas actualizar.</p></div></div>
         <div class="quick-grid">
-          <button class="quick-card" data-go="programa"><span>▣</span><b>Editar programas</b><small>Horarios, descripción y grabaciones</small><i>→</i></button>
-          <button class="quick-card" data-go="menu"><span>☷</span><b>Editar menús</b><small>Mensajes y textos principales</small><i>→</i></button>
-          <button class="quick-card" data-go="noticia"><span>▤</span><b>Actualizar noticias</b><small>Enlaces de portadas</small><i>→</i></button>
-          <button class="quick-card" data-go="contacto"><span>◎</span><b>Editar contactos</b><small>Redes sociales y ubicación</small><i>→</i></button>
+          <button class="quick-card" data-go="programa"><span>▣</span><b>Programación y programas</b><small>Horarios, descripciones y grabaciones</small><i>→</i></button>
+          <button class="quick-card" data-go="menu"><span>☷</span><b>Menús y submenús</b><small>Organiza las opciones de WhatsApp</small><i>→</i></button>
+          <button class="quick-card" data-go="consultas"><span>✉</span><b>Revisar consultas</b><small>Mensajes e imágenes recibidas</small><i>→</i></button>
+          <button class="quick-card" data-go="contacto"><span>◎</span><b>Ubicación y contactos</b><small>Redes sociales y datos de contacto</small><i>→</i></button>
         </div>
-        <div class="notice"><span>ⓘ</span><p><b>Importante:</b> Los cambios se guardan en Neon PostgreSQL y se reflejan en el contenido que utiliza el chatbot. No necesitas modificar el código para editar estos datos.</p></div>
+        <div class="notice"><span>ⓘ</span><p>Los cambios de contenido se guardan en Neon PostgreSQL. No necesitas modificar el código para actualizar los textos, menús o programas.</p></div>
+      </section>
+
+      <section id="contentPage" class="page hidden">
+        <div class="content-toolbar"><div><p class="eyebrow" id="contentEyebrow">ADMINISTRACIÓN</p><h1 id="contentTitle">Contenido</h1><p id="contentDescription" class="muted"></p></div><button id="addBtn" class="primary">＋ Nuevo registro</button></div>
+        <div id="contentNotice" class="notice hidden"></div>
+        <div id="records" class="records-grid"></div>
+        <div id="emptyState" class="empty-state hidden"><div>▤</div><h3>No hay registros</h3><p>Agrega el primer registro con el botón superior.</p></div>
+      </section>
+
+      <section id="consultasPage" class="page hidden">
+        <div class="content-toolbar"><div><p class="eyebrow">ATENCIÓN AL USUARIO</p><h1>Consultas recibidas</h1><p class="muted">Revisa los mensajes y las imágenes enviadas por los usuarios de WhatsApp.</p></div><button id="refreshConsultas" class="outline">Actualizar</button></div>
+        <div class="filter-row"><label for="filterEstado">Mostrar</label><select id="filterEstado"><option value="todas">Todas las consultas</option><option value="pendiente">Pendientes</option><option value="atendida">Atendidas</option><option value="archivada">Archivadas</option></select></div>
+        <div id="consultasList" class="consultas-list"></div>
+        <div id="emptyConsultas" class="empty-state hidden"><div>✉</div><h3>No hay consultas</h3><p>Cuando un usuario envíe una consulta, aparecerá aquí.</p></div>
+      </section>
+
+      <section id="imagenesPage" class="page hidden">
+        <div class="content-toolbar"><div><p class="eyebrow">MULTIMEDIA</p><h1>Biblioteca de imágenes</h1><p class="muted">Sube imágenes para utilizarlas en las portadas y contenidos.</p></div></div>
+        <div class="upload-card"><h3>Subir nueva imagen</h3><form id="uploadForm"><label for="imagenArchivo" class="upload-area"><span>☁</span><strong>Selecciona una imagen</strong><small>JPG, PNG o WEBP · Máximo 8 MB</small></label><input type="file" id="imagenArchivo" accept="image/jpeg,image/png,image/webp" required><div id="previewImagen" class="preview-imagen"></div><button type="submit" class="primary" id="uploadBtn">Subir imagen</button><p id="uploadError" class="error"></p></form></div>
+        <div class="section-heading"><div><h3>Imágenes disponibles</h3><p>Selecciona una imagen para utilizarla en una noticia.</p></div><button id="refreshImages" class="outline">Actualizar</button></div>
+        <div id="imageGallery" class="image-gallery"></div><div id="emptyImages" class="empty-state hidden"><div>▧</div><h3>No hay imágenes todavía</h3><p>Sube tu primera imagen para comenzar.</p></div>
       </section>
 
       <section id="configPage" class="page hidden">
-        <div class="content-toolbar"><div><p class="eyebrow">AJUSTES GENERALES</p><h1>Configuración del chatbot</h1><p class="muted">Personaliza los mensajes generales que utiliza el asistente.</p></div></div>
-        <div class="modal-card config-card">
-          <form id="configForm">
-            <div class="form-grid">
-              <div class="field wide"><label for="configNombre">Nombre del chatbot</label><input id="configNombre" name="nombre_bot" maxlength="80" required></div>
-              <div class="field wide"><label for="configBienvenida">Mensaje de bienvenida</label><textarea id="configBienvenida" name="mensaje_bienvenida" maxlength="2000" required></textarea><small>Se utiliza en el encabezado del menú principal cuando no existe un texto personalizado para ese menú.</small></div>
-              <div class="field wide"><label for="configDespedida">Mensaje de despedida</label><textarea id="configDespedida" name="mensaje_despedida" maxlength="2000" required></textarea><small>Queda guardado como configuración; en esta primera entrega todavía no se dispara automáticamente.</small></div>
-              <div class="field wide"><label for="configFallback">Mensaje para opciones no reconocidas</label><textarea id="configFallback" name="mensaje_sin_respuesta" maxlength="2000" required></textarea><small>Texto preparado para conectarlo al flujo de respuestas en la siguiente etapa.</small></div>
-            </div>
-            <div class="modal-actions"><button class="primary" type="submit" id="saveConfigBtn">Guardar configuración</button></div>
-            <p id="configError" class="error" role="alert"></p>
-          </form>
-        </div>
+        <div class="content-toolbar"><div><p class="eyebrow">AJUSTES GENERALES</p><h1>Configuración del chatbot</h1><p class="muted">Personaliza los mensajes generales del asistente.</p></div></div>
+        <div class="modal-card"><form id="configForm"><div class="form-grid">
+          <div class="field wide"><label for="configNombre">Nombre del chatbot</label><input id="configNombre" name="nombre_bot" maxlength="80" required></div>
+          <div class="field wide"><label for="configBienvenida">Mensaje de bienvenida</label><textarea id="configBienvenida" name="mensaje_bienvenida" maxlength="2000" required></textarea></div>
+          <div class="field wide"><label for="configDespedida">Mensaje de despedida</label><textarea id="configDespedida" name="mensaje_despedida" maxlength="2000" required></textarea></div>
+          <div class="field wide"><label for="configFallback">Mensaje para opciones no reconocidas</label><textarea id="configFallback" name="mensaje_sin_respuesta" maxlength="2000" required></textarea></div>
+        </div><div class="modal-actions"><button class="primary" type="submit" id="saveConfigBtn">Guardar configuración</button></div><p id="configError" class="error"></p></form></div>
       </section>
-<section id="imagenesPage" class="page hidden">
-
-  <div class="content-toolbar">
-    <div>
-      <p class="eyebrow">MULTIMEDIA</p>
-      <h1>Biblioteca de imágenes</h1>
-      <p class="muted">
-        Sube, visualiza y administra las imágenes de UPEA TV.
-      </p>
-    </div>
-  </div>
-
-  <div class="upload-card">
-    <h3>Subir nueva imagen</h3>
-
-    <form id="uploadForm">
-      <label for="imagenArchivo" class="upload-area">
-        <span>☁</span>
-        <strong>Selecciona una imagen</strong>
-        <small>JPG, PNG o WEBP · Máximo 8 MB</small>
-      </label>
-
-      <input
-        type="file"
-        id="imagenArchivo"
-        accept="image/jpeg,image/png,image/webp"
-        required
-      >
-
-      <div id="previewImagen" class="preview-imagen"></div>
-
-      <button type="submit" class="primary" id="uploadBtn">
-        Subir imagen
-      </button>
-
-      <p id="uploadError" class="error"></p>
-    </form>
-  </div>
-
-  <div class="section-heading">
-    <div>
-      <h3>Imágenes disponibles</h3>
-      <p>Selecciona una imagen para utilizarla en una portada.</p>
-    </div>
-
-    <button id="refreshImages" class="outline">
-      Actualizar
-    </button>
-  </div>
-
-  <div id="imageGallery" class="image-gallery"></div>
-
-  <div id="emptyImages" class="empty-state hidden">
-    <div>▧</div>
-    <h3>No hay imágenes todavía</h3>
-    <p>Sube tu primera imagen para comenzar.</p>
-  </div>
-
-</section>
-      <section id="contentPage" class="page hidden">
-        <div class="content-toolbar"><div><p class="eyebrow" id="contentEyebrow">ADMINISTRACIÓN</p><h1 id="contentTitle">Programas</h1><p id="contentDescription" class="muted">Administra el contenido.</p></div><button id="addBtn" class="primary">＋ Nuevo registro</button></div>
-        <div id="contentNotice" class="notice hidden"></div>
-        <div id="records" class="records-grid"></div>
-        <div id="emptyState" class="empty-state hidden"><div>▤</div><h3>No hay registros todavía</h3><p>Agrega el primer registro con el botón superior.</p></div>
-      </section>
-      
     </main>
   </div>
 
-  <div id="editorModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
-    <div class="modal-backdrop" data-close="true"></div>
-    <div class="modal-card"><div class="modal-head"><div><p class="eyebrow">EDICIÓN DE CONTENIDO</p><h2 id="editorTitle">Nuevo registro</h2></div><button class="icon-button" id="closeModal" aria-label="Cerrar">×</button></div>
-      <form id="editorForm"><div id="editorFields" class="form-grid"></div><div class="modal-actions"><button type="button" id="cancelEdit" class="outline">Cancelar</button><button type="submit" class="primary" id="saveBtn">Guardar cambios</button></div><p id="editorError" class="error"></p></form>
-    </div>
-  </div>
+  <div id="editorModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editorTitle"><div class="modal-backdrop" data-close="true"></div><div class="modal-card modal-large"><div class="modal-head"><div><p class="eyebrow">EDICIÓN DE CONTENIDO</p><h2 id="editorTitle">Nuevo registro</h2></div><button class="icon-button" id="closeModal" type="button" aria-label="Cerrar">×</button></div><form id="editorForm"><div id="editorFields" class="form-grid"></div><div class="modal-actions"><button type="button" id="cancelEdit" class="outline">Cancelar</button><button type="submit" class="primary" id="saveBtn">Guardar cambios</button></div><p id="editorError" class="error"></p></form></div></div>
+  <div id="consultationModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="consultationTitle"><div class="modal-backdrop" data-close-consult="true"></div><div class="modal-card modal-large"><div class="modal-head"><div><p class="eyebrow">DETALLE DE CONSULTA</p><h2 id="consultationTitle">Consulta</h2></div><button class="icon-button" id="closeConsultation" type="button" aria-label="Cerrar">×</button></div><div id="consultationDetail"></div></div></div>
   <div id="toast" class="toast" role="status"></div>
-  <script src="admin.js" defer></script>
 </body>
 </html>
